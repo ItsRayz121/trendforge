@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase-browser";
+import type { User } from "@supabase/supabase-js";
 import {
   LayoutDashboard,
   TrendingUp,
@@ -17,6 +19,7 @@ import {
   Bookmark,
   FileBarChart2,
   Microscope,
+  LogOut,
 } from "lucide-react";
 
 interface NavItem {
@@ -29,7 +32,25 @@ interface NavItem {
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [alertCount, setAlertCount] = useState(0);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/auth/login");
+    router.refresh();
+  };
 
   // Poll unread alert count every 60s
   useEffect(() => {
@@ -147,18 +168,34 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           })}
         </nav>
 
-        {/* Bottom info */}
+        {/* Bottom: User info + logout */}
         <div className="p-4 border-t border-surface-700">
-          <div className="bg-surface-700 rounded-lg p-3">
-            <p className="text-xs font-medium text-slate-300 mb-1">AI Credits</p>
-            <div className="h-1.5 bg-surface-500 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-violet-600 to-purple-500 rounded-full"
-                style={{ width: "72%" }}
-              />
+          {user ? (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                {user.email?.[0]?.toUpperCase() ?? "U"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-slate-300 truncate">{user.email}</p>
+                <p className="text-[10px] text-slate-600">Free plan</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="text-slate-600 hover:text-red-400 transition-colors p-1"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
-            <p className="text-[10px] text-slate-500 mt-1.5">72 / 100 credits used</p>
-          </div>
+          ) : (
+            <Link
+              href="/auth/login"
+              className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-violet-600/20 border border-violet-500/20 text-violet-400 text-xs font-medium hover:bg-violet-600/30 transition-colors"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              Sign In
+            </Link>
+          )}
         </div>
       </aside>
     </>

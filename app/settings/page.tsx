@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import {
   RotateCcw,
   X,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase-browser";
 
 interface SettingsState {
   openaiKey: string;
@@ -83,25 +84,55 @@ const defaultSettings: SettingsState = {
 };
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<SettingsState>(() => {
-    try {
-      const stored = localStorage.getItem("trendforge_settings");
-      if (!stored) return defaultSettings;
-      const parsed = JSON.parse(stored);
-      // Migrate old customBaseUrl → providerBaseUrl
-      if (!parsed.providerBaseUrl && parsed.customBaseUrl) {
-        parsed.providerBaseUrl = parsed.customBaseUrl;
-      }
-      return { ...defaultSettings, ...parsed };
-    } catch {
-      return defaultSettings;
-    }
-  });
-
+  const [settings, setSettings] = useState<SettingsState>(defaultSettings);
   const [showOpenAI, setShowOpenAI] = useState(false);
   const [showGNews, setShowGNews] = useState(false);
   const [showCustomKey, setShowCustomKey] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Load settings: Supabase first, fallback to localStorage
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (user) {
+          const { data } = await supabase
+            .from("user_settings")
+            .select("settings")
+            .eq("user_id", user.id)
+            .single();
+
+          if (data?.settings) {
+            const parsed = data.settings;
+            if (!parsed.providerBaseUrl && parsed.customBaseUrl) {
+              parsed.providerBaseUrl = parsed.customBaseUrl;
+            }
+            setSettings({ ...defaultSettings, ...parsed });
+            localStorage.setItem("trendforge_settings", JSON.stringify(parsed));
+            return;
+          }
+        }
+
+        // Fallback: localStorage
+        const stored = localStorage.getItem("trendforge_settings");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (!parsed.providerBaseUrl && parsed.customBaseUrl) {
+            parsed.providerBaseUrl = parsed.customBaseUrl;
+          }
+          setSettings({ ...defaultSettings, ...parsed });
+        }
+      } catch {
+        const stored = localStorage.getItem("trendforge_settings");
+        if (stored) {
+          try { setSettings({ ...defaultSettings, ...JSON.parse(stored) }); } catch {}
+        }
+      }
+    };
+    loadSettings();
+  }, []);
 
   const update = (key: keyof SettingsState, value: any) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -125,8 +156,21 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
+    // Always save to localStorage
     localStorage.setItem("trendforge_settings", JSON.stringify(settings));
-    await new Promise((r) => setTimeout(r, 600));
+
+    // Also sync to Supabase if logged in
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("user_settings").upsert(
+          { user_id: user.id, settings, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" }
+        );
+      }
+    } catch {}
+
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
