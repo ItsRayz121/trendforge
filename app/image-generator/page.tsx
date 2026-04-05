@@ -1,10 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Label, FormGroup, Textarea } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { platforms, imageRatios } from "@/data/platforms";
 import { generateImagePrompt } from "@/lib/ai";
 import type { Platform, ImageGenerateRequest, ImageGenerateResponse } from "@/lib/types";
@@ -16,6 +15,10 @@ import {
   ExternalLink,
   Sparkles,
   Info,
+  Download,
+  Bookmark,
+  BookmarkCheck,
+  Clock,
 } from "lucide-react";
 import { copyToClipboard } from "@/lib/utils";
 
@@ -45,6 +48,12 @@ const campaignGoals = [
   "Motivational Content",
 ];
 
+interface ImageHistoryItem {
+  imageUrl: string;
+  topic: string;
+  createdAt: string;
+}
+
 export default function ImageGeneratorPage() {
   const [platform, setPlatform] = useState<Platform>("instagram");
   const [imageType, setImageType] = useState("Post");
@@ -57,6 +66,17 @@ export default function ImageGeneratorPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImageGenerateResponse | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [imageHistory, setImageHistory] = useState<ImageHistoryItem[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("trendforge_image_history");
+      if (stored) setImageHistory(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, []);
 
   const currentRatios = imageRatios[platform] || [];
   const currentImageTypes = imageTypes[platform] || [];
@@ -71,6 +91,8 @@ export default function ImageGeneratorPage() {
     e.preventDefault();
     if (!topic.trim()) return;
     setLoading(true);
+    setGeneratedImageUrl(null);
+    setSaved(false);
     try {
       const req: ImageGenerateRequest = {
         platform,
@@ -84,8 +106,33 @@ export default function ImageGeneratorPage() {
       };
       const res = await generateImagePrompt(req);
       setResult(res);
+
+      // Now generate the real image via Pollinations
+      setImageLoading(true);
+      const imgRes = await fetch("/api/image-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: res.prompt, ratio, style: visualStyle, topic }),
+      });
+      if (imgRes.ok) {
+        const { imageUrl } = await imgRes.json();
+        setGeneratedImageUrl(imageUrl);
+
+        // Save to local history
+        const historyItem: ImageHistoryItem = {
+          imageUrl,
+          topic,
+          createdAt: new Date().toISOString(),
+        };
+        setImageHistory((prev) => {
+          const updated = [historyItem, ...prev].slice(0, 5);
+          localStorage.setItem("trendforge_image_history", JSON.stringify(updated));
+          return updated;
+        });
+      }
     } finally {
       setLoading(false);
+      setImageLoading(false);
     }
   };
 
@@ -95,11 +142,31 @@ export default function ImageGeneratorPage() {
     setTimeout(() => setCopied(null), 2000);
   };
 
+  const handleSaveToLibrary = async () => {
+    if (!generatedImageUrl || !result) return;
+    try {
+      await fetch("/api/image-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: result.prompt,
+          ratio,
+          style: visualStyle,
+          topic,
+          saveOnly: true,
+        }),
+      });
+      setSaved(true);
+    } catch {
+      setSaved(true); // optimistic
+    }
+  };
+
   return (
-    <AppShell title="Image Generator" subtitle="Professional AI image prompts for every platform">
+    <AppShell title="Image Generator" subtitle="Professional AI image prompts + real generated images">
       <div className="grid lg:grid-cols-[380px_1fr] xl:grid-cols-[420px_1fr] gap-6">
         {/* Form */}
-        <div>
+        <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>
@@ -242,10 +309,10 @@ export default function ImageGeneratorPage() {
                 </FormGroup>
 
                 <Button type="submit" loading={loading} disabled={!topic.trim()} className="w-full" size="lg">
-                  {loading ? "Generating prompt..." : (
+                  {loading ? "Generating..." : (
                     <>
                       <Wand2 className="w-4 h-4" />
-                      Generate Image Prompt
+                      Generate Image
                       <Sparkles className="w-3.5 h-3.5 opacity-60" />
                     </>
                   )}
@@ -253,6 +320,41 @@ export default function ImageGeneratorPage() {
               </form>
             </CardContent>
           </Card>
+
+          {/* Image History */}
+          {imageHistory.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-slate-400" />
+                    Recent Images
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-2">
+                  {imageHistory.slice(0, 3).map((item, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setGeneratedImageUrl(item.imageUrl)}
+                      className="relative group rounded-lg overflow-hidden border border-surface-600 hover:border-violet-500/40 transition-all"
+                    >
+                      <img
+                        src={item.imageUrl}
+                        alt={item.topic}
+                        className="w-full h-20 object-cover"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-[10px] text-white">View</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Results */}
@@ -260,14 +362,14 @@ export default function ImageGeneratorPage() {
           {!result && !loading && (
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <ImageIcon className="w-12 h-12 text-slate-600 mb-3" />
-              <p className="text-sm font-medium text-slate-400">Your image prompt will appear here</p>
+              <p className="text-sm font-medium text-slate-400">Your generated image will appear here</p>
               <p className="text-xs text-slate-600 mt-1">Fill in the details and click Generate</p>
             </div>
           )}
 
           {loading && (
             <div className="space-y-4">
-              {Array.from({ length: 4 }).map((_, i) => (
+              {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="rounded-xl border border-surface-500 bg-surface-800 p-5">
                   <div className="shimmer h-4 w-1/3 rounded mb-3" />
                   <div className="shimmer h-3 w-full rounded mb-2" />
@@ -279,8 +381,64 @@ export default function ImageGeneratorPage() {
 
           {result && !loading && (
             <>
-              {/* Main prompt */}
+              {/* Generated Image */}
               <Card glow>
+                <CardHeader>
+                  <CardTitle>
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-pink-400" />
+                      Generated Image
+                    </div>
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    {generatedImageUrl && !imageLoading && (
+                      <>
+                        <a href={generatedImageUrl} download={`trendforge-${Date.now()}.jpg`} target="_blank" rel="noopener noreferrer">
+                          <Button variant="secondary" size="sm">
+                            <Download className="w-3.5 h-3.5" />
+                            Download
+                          </Button>
+                        </a>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleSaveToLibrary}
+                          disabled={saved}
+                        >
+                          {saved ? (
+                            <><BookmarkCheck className="w-3.5 h-3.5 text-green-400" /> Saved</>
+                          ) : (
+                            <><Bookmark className="w-3.5 h-3.5" /> Save</>
+                          )}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {imageLoading && (
+                    <div className="rounded-xl bg-surface-700 border border-surface-500 aspect-square flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                        <p className="text-xs text-slate-400">Generating image with AI...</p>
+                        <p className="text-[10px] text-slate-600 mt-1">This may take 10-30 seconds</p>
+                      </div>
+                    </div>
+                  )}
+                  {generatedImageUrl && !imageLoading && (
+                    <div className="rounded-xl overflow-hidden border border-surface-500">
+                      <img
+                        src={generatedImageUrl}
+                        alt={topic}
+                        className="w-full object-cover"
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Prompt card */}
+              <Card>
                 <CardHeader>
                   <CardTitle>
                     <div className="flex items-center gap-2">
@@ -352,55 +510,35 @@ export default function ImageGeneratorPage() {
                 </CardContent>
               </Card>
 
-              {/* Reference links */}
+              {/* Use prompt in other tools */}
               <Card>
                 <CardHeader>
                   <CardTitle>
                     <div className="flex items-center gap-2">
                       <ExternalLink className="w-4 h-4 text-orange-400" />
-                      Reference & Inspiration Links
+                      Use Prompt in Other Tools
                     </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    {result.referenceLinks.map((link, i) => (
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: "Midjourney", url: "https://midjourney.com" },
+                      { label: "DALL·E 3", url: "https://openai.com/dall-e-3" },
+                      { label: "Stable Diffusion", url: "https://stability.ai" },
+                      { label: "Adobe Firefly", url: "https://firefly.adobe.com" },
+                      { label: "Leonardo AI", url: "https://leonardo.ai" },
+                    ].map((tool) => (
                       <a
-                        key={i}
-                        href={link.url}
+                        key={tool.label}
+                        href={tool.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between gap-3 p-3 rounded-lg bg-surface-700 border border-surface-500 hover:border-violet-500/30 hover:bg-violet-500/5 transition-all group"
+                        className="text-xs px-2.5 py-1.5 rounded-lg bg-surface-700 border border-surface-500 text-violet-400 hover:bg-violet-500/10 hover:border-violet-500/30 transition-all"
                       >
-                        <span className="text-sm text-slate-300 group-hover:text-violet-300 transition-colors">
-                          {link.label}
-                        </span>
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-600 group-hover:text-violet-400 flex-shrink-0 transition-colors" />
+                        {tool.label} ↗
                       </a>
                     ))}
-                    {/* Always show these top AI image generators */}
-                    <div className="pt-2 border-t border-surface-600">
-                      <p className="text-[10px] text-slate-600 mb-2">Use your prompt in:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { label: "Midjourney", url: "https://midjourney.com" },
-                          { label: "DALL·E 3", url: "https://openai.com/dall-e-3" },
-                          { label: "Stable Diffusion", url: "https://stability.ai" },
-                          { label: "Adobe Firefly", url: "https://firefly.adobe.com" },
-                          { label: "Leonardo AI", url: "https://leonardo.ai" },
-                        ].map((tool) => (
-                          <a
-                            key={tool.label}
-                            href={tool.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs px-2.5 py-1.5 rounded-lg bg-surface-700 border border-surface-500 text-violet-400 hover:bg-violet-500/10 hover:border-violet-500/30 transition-all"
-                          >
-                            {tool.label} ↗
-                          </a>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 </CardContent>
               </Card>

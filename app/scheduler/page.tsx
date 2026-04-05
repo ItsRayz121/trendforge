@@ -1,12 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input, Select, Label, FormGroup, Textarea } from "@/components/ui/input";
+import { Input, Label, FormGroup, Textarea } from "@/components/ui/input";
 import { platforms } from "@/data/platforms";
-import { getBestPostingTimes, getPlatformBg, formatDate } from "@/lib/utils";
+import { getBestPostingTimes, getPlatformBg } from "@/lib/utils";
 import type { Platform, ScheduledPost } from "@/lib/types";
 import {
   Calendar,
@@ -17,42 +17,8 @@ import {
   AlertCircle,
   Timer,
   Edit3,
+  RefreshCw,
 } from "lucide-react";
-
-const initialPosts: ScheduledPost[] = [
-  {
-    id: "1",
-    content: "Bitcoin just hit $120K and here's what you NEED to know before the week starts 🧵\n\nThread on why this cycle is different...",
-    platform: "twitter",
-    scheduledAt: new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString(),
-    status: "scheduled",
-    topic: "Bitcoin ATH Analysis",
-  },
-  {
-    id: "2",
-    content: "The AI tools reshaping content creation in 2025 ✨\n\nI tested 12 tools so you don't have to. Here's my honest breakdown...",
-    platform: "instagram",
-    scheduledAt: new Date(Date.now() + 1000 * 60 * 60 * 5).toISOString(),
-    status: "scheduled",
-    topic: "AI Tools Review",
-  },
-  {
-    id: "3",
-    content: "📌 IMPORTANT UPDATE\n\nThe halal food market just crossed $2.5 trillion globally. Here's what this means for brands targeting Muslim consumers...",
-    platform: "telegram",
-    scheduledAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    status: "published",
-    topic: "Halal Market Report",
-  },
-  {
-    id: "4",
-    content: "Remote work in 2025 — the real numbers that nobody is talking about.\n\nOffice vacancy: 20% globally. Suburban home sales: up 35%.",
-    platform: "facebook",
-    scheduledAt: new Date(Date.now() + 1000 * 60 * 60 * 10).toISOString(),
-    status: "draft",
-    topic: "Remote Work Trends",
-  },
-];
 
 const platformIcons: Record<Platform, string> = {
   telegram: "✈️",
@@ -94,39 +60,84 @@ function formatScheduledTime(dateString: string): string {
 }
 
 export default function SchedulerPage() {
-  const [posts, setPosts] = useState<ScheduledPost[]>(initialPosts);
+  const [posts, setPosts] = useState<ScheduledPost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>("instagram");
   const [newContent, setNewContent] = useState("");
   const [newTopic, setNewTopic] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleAddPost = () => {
-    if (!newContent.trim() || !scheduledAt) return;
-    const post: ScheduledPost = {
-      id: Date.now().toString(),
-      content: newContent,
-      platform: selectedPlatform,
-      scheduledAt: new Date(scheduledAt).toISOString(),
-      status: "scheduled",
-      topic: newTopic || "Custom Post",
-    };
-    setPosts((prev) => [post, ...prev]);
-    setNewContent("");
-    setNewTopic("");
-    setScheduledAt("");
-    setShowForm(false);
+  const loadPosts = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/scheduled-posts");
+      if (res.ok) {
+        const data = await res.json();
+        // Map Supabase column names to our type
+        setPosts(data.map((p: any) => ({
+          id: p.id,
+          topic: p.topic,
+          content: p.content,
+          platform: p.platform as Platform,
+          scheduledAt: p.scheduled_at,
+          status: p.status,
+        })));
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
+  useEffect(() => {
+    loadPosts();
+  }, []);
+
+  const handleAddPost = async () => {
+    if (!newContent.trim() || !scheduledAt) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/scheduled-posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: newTopic || "Custom Post",
+          content: newContent,
+          platform: selectedPlatform,
+          scheduled_at: new Date(scheduledAt).toISOString(),
+        }),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        const post: ScheduledPost = {
+          id: saved.id,
+          topic: saved.topic,
+          content: saved.content,
+          platform: saved.platform as Platform,
+          scheduledAt: saved.scheduled_at,
+          status: saved.status,
+        };
+        setPosts((prev) => [post, ...prev]);
+        setNewContent("");
+        setNewTopic("");
+        setScheduledAt("");
+        setShowForm(false);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    // Optimistic update
     setPosts((prev) => prev.filter((p) => p.id !== id));
+    await fetch(`/api/scheduled-posts?id=${id}`, { method: "DELETE" });
   };
 
   const filteredPosts =
     filterStatus === "all" ? posts : posts.filter((p) => p.status === filterStatus);
-
-  const bestTimes = getBestPostingTimes(selectedPlatform);
 
   return (
     <AppShell title="Content Scheduler" subtitle="Plan and manage your content calendar">
@@ -226,6 +237,7 @@ export default function SchedulerPage() {
                     <Button
                       onClick={handleAddPost}
                       disabled={!newContent.trim() || !scheduledAt}
+                      loading={submitting}
                       className="w-full"
                     >
                       <Calendar className="w-4 h-4" />
@@ -275,7 +287,14 @@ export default function SchedulerPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-slate-200">Content Queue</h2>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={loadPosts}
+                  className="text-slate-500 hover:text-slate-300 transition-colors p-1"
+                  title="Refresh"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                </button>
                 {["all", "scheduled", "draft", "published"].map((s) => (
                   <button
                     key={s}
@@ -292,53 +311,64 @@ export default function SchedulerPage() {
               </div>
             </div>
 
-            <div className="space-y-3">
-              {filteredPosts.length === 0 && (
-                <div className="text-center py-12">
-                  <Calendar className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                  <p className="text-sm text-slate-500">No posts found</p>
-                </div>
-              )}
-              {filteredPosts.map((post) => {
-                const config = statusConfig[post.status];
-                const StatusIcon = config.icon;
-                return (
-                  <Card key={post.id} className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <span className="text-2xl">{platformIcons[post.platform]}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <p className="text-xs font-semibold text-slate-200">{post.topic}</p>
-                          <Badge variant={config.variant}>
-                            <StatusIcon className="w-2.5 h-2.5" />
-                            {config.label}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-2">
-                          {post.content}
-                        </p>
-                        <div className="flex items-center gap-3 text-[10px] text-slate-600">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {formatScheduledTime(post.scheduledAt)}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-full border ${getPlatformBg(post.platform)}`}
-                          >
-                            {platformLabels[post.platform]}
-                          </span>
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="rounded-xl border border-surface-500 bg-surface-800 p-5">
+                    <div className="shimmer h-4 w-1/3 rounded mb-3" />
+                    <div className="shimmer h-3 w-full rounded mb-2" />
+                    <div className="shimmer h-3 w-2/3 rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredPosts.length === 0 && (
+                  <div className="text-center py-12">
+                    <Calendar className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                    <p className="text-sm text-slate-500">No posts found</p>
+                    <p className="text-xs text-slate-600 mt-1">Add your first post using the form</p>
+                  </div>
+                )}
+                {filteredPosts.map((post) => {
+                  const config = statusConfig[post.status];
+                  const StatusIcon = config.icon;
+                  return (
+                    <Card key={post.id} className="flex flex-col sm:flex-row gap-4">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <span className="text-2xl">{platformIcons[post.platform]}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="text-xs font-semibold text-slate-200">{post.topic}</p>
+                            <Badge variant={config.variant}>
+                              <StatusIcon className="w-2.5 h-2.5" />
+                              {config.label}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-2">
+                            {post.content}
+                          </p>
+                          <div className="flex items-center gap-3 text-[10px] text-slate-600">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formatScheduledTime(post.scheduledAt)}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full border ${getPlatformBg(post.platform)}`}>
+                              {platformLabels[post.platform]}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex sm:flex-col gap-2 justify-end">
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(post.id)}>
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+                      <div className="flex sm:flex-col gap-2 justify-end">
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(post.id)}>
+                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,10 +1,11 @@
 "use client";
+import { useState, useEffect } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LiveFeed } from "@/components/live-feed";
-import { demoContentHistory } from "@/data/demo-topics";
+import { supabase } from "@/lib/supabase";
 import { getPlatformBg, timeAgo } from "@/lib/utils";
 import type { Platform } from "@/lib/types";
 import {
@@ -16,6 +17,7 @@ import {
   Zap,
   BarChart3,
   FileText,
+  Bookmark,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -38,7 +40,7 @@ const quickActions = [
   },
   {
     label: "Generate Image",
-    description: "Create platform-specific prompts",
+    description: "Create platform-specific images",
     icon: ImageIcon,
     href: "/image-generator",
     color: "text-pink-400",
@@ -70,18 +72,53 @@ const platformIcons: Record<Platform, string> = {
   linkedin: "💼",
 };
 
+interface SavedContentItem {
+  id: string;
+  topic: string;
+  platform: Platform;
+  content: string;
+  saved_at: string;
+}
+
 export default function DashboardPage() {
+  const [stats, setStats] = useState({ generated: 0, saved: 0, scheduled: 0, alerts: 0 });
+  const [recentContent, setRecentContent] = useState<SavedContentItem[]>([]);
+
+  useEffect(() => {
+    // Local stats
+    const history = JSON.parse(localStorage.getItem("trendforge_gen_history") || "[]");
+    const alerts = JSON.parse(localStorage.getItem("trendforge_alerts") || "[]");
+
+    // Supabase stats + recent saved content
+    Promise.all([
+      supabase.from("saved_content").select("*", { count: "exact" }).order("saved_at", { ascending: false }).limit(3),
+      supabase.from("scheduled_posts").select("id", { count: "exact" }).eq("status", "scheduled"),
+    ]).then(([savedRes, scheduledRes]) => {
+      setStats({
+        generated: history.length,
+        saved: savedRes.count ?? 0,
+        scheduled: scheduledRes.count ?? 0,
+        alerts: alerts.length,
+      });
+      if (savedRes.data) {
+        setRecentContent(savedRes.data as SavedContentItem[]);
+      }
+    });
+  }, []);
+
+  const statsConfig = [
+    { label: "Content Generated", value: String(stats.generated), icon: FileText, trend: "From Studio" },
+    { label: "Saved Content", value: String(stats.saved), icon: Bookmark, trend: "In Library" },
+    { label: "Scheduled Posts", value: String(stats.scheduled), icon: Calendar, trend: "Upcoming" },
+    { label: "Active Alerts", value: String(stats.alerts), icon: Zap, trend: "Monitoring" },
+  ];
+
   return (
     <AppShell title="Dashboard" subtitle="Welcome back, Creator">
       <div className="space-y-6">
         {/* Stats row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: "Content Generated", value: "247", icon: FileText, trend: "+12 today" },
-            { label: "Trends Tracked", value: "1,340", icon: TrendingUp, trend: "Live" },
-            { label: "Platforms Active", value: "4", icon: Zap, trend: "All active" },
-            { label: "AI Credits Left", value: "28", icon: BarChart3, trend: "72 used" },
-          ].map((stat) => {
+          {statsConfig.map((stat) => {
             const Icon = stat.icon;
             return (
               <Card key={stat.label} glow>
@@ -108,13 +145,8 @@ export default function DashboardPage() {
               const Icon = action.icon;
               return (
                 <Link key={action.href} href={action.href}>
-                  <Card
-                    hover
-                    className="h-full flex flex-col gap-3 p-4"
-                  >
-                    <div
-                      className={`w-10 h-10 rounded-xl border flex items-center justify-center ${action.bg}`}
-                    >
+                  <Card hover className="h-full flex flex-col gap-3 p-4">
+                    <div className={`w-10 h-10 rounded-xl border flex items-center justify-center ${action.bg}`}>
                       <Icon className={`w-5 h-5 ${action.color}`} />
                     </div>
                     <div>
@@ -151,7 +183,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Recent content */}
+          {/* Recent saved content */}
           <Card>
             <CardHeader>
               <CardTitle>
@@ -160,30 +192,38 @@ export default function DashboardPage() {
                   Recent Content
                 </div>
               </CardTitle>
-              <Link href="/studio">
+              <Link href="/saved">
                 <Button variant="ghost" size="sm">
-                  Create new <ArrowRight className="w-3 h-3" />
+                  View all <ArrowRight className="w-3 h-3" />
                 </Button>
               </Link>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {demoContentHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-start gap-3 p-3 rounded-lg bg-surface-700 border border-surface-500 hover:border-surface-400 transition-colors"
-                  >
-                    <span className="text-lg flex-shrink-0">{platformIcons[item.platform]}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-300 truncate">{item.topic}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{item.preview}</p>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <Badge variant="default">{platformLabels[item.platform]}</Badge>
-                        <span className="text-[10px] text-slate-600">{timeAgo(item.createdAt)}</span>
+                {recentContent.length === 0 ? (
+                  <div className="text-center py-6">
+                    <Bookmark className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                    <p className="text-xs text-slate-500">No saved content yet</p>
+                    <p className="text-[11px] text-slate-600 mt-1">Generate and save content from the Studio</p>
+                  </div>
+                ) : (
+                  recentContent.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-surface-700 border border-surface-500 hover:border-surface-400 transition-colors"
+                    >
+                      <span className="text-lg flex-shrink-0">{platformIcons[item.platform] || "📄"}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-slate-300 truncate">{item.topic}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{item.content}</p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <Badge variant="default">{platformLabels[item.platform as Platform] || item.platform}</Badge>
+                          <span className="text-[10px] text-slate-600">{timeAgo(item.saved_at)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
                 <Link href="/studio">
                   <button className="w-full py-2.5 rounded-lg border border-dashed border-surface-400 text-xs text-slate-500 hover:text-slate-300 hover:border-surface-300 transition-colors mt-1">
                     + Create new content

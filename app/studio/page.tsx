@@ -97,6 +97,23 @@ function StudioContent() {
     localStorage.removeItem("trendforge_gen_history");
   };
 
+  const handleSave = async (platform: string, content: string, hashtags: string[], cta: string) => {
+    if (!lastRequest) return;
+    await fetch("/api/save-content", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic: lastRequest.topic,
+        platform,
+        content,
+        hashtags,
+        cta,
+        char_count: content.length,
+        generated_at: response?.generatedAt,
+      }),
+    });
+  };
+
   const tips = [
     "Add a trending keyword to boost relevance",
     "Select multiple platforms for cross-posting",
@@ -210,6 +227,7 @@ function StudioContent() {
                 response={response}
                 onRegenerate={handleRegenerate}
                 originalRequest={lastRequest}
+                onSave={handleSave}
               />
             </CardContent>
           </Card>

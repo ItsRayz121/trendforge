@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { GenerateResponse, Platform, GenerateRequest } from "@/lib/types";
 import { getPlatformBg, copyToClipboard } from "@/lib/utils";
-import { Copy, Check, Download, RefreshCw, History, ChevronDown, ChevronUp } from "lucide-react";
+import { Copy, Check, Download, RefreshCw, History, ChevronDown, ChevronUp, Bookmark, BookmarkCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const platformIcons: Record<Platform, string> = {
@@ -34,14 +34,17 @@ interface OutputTabsProps {
   response: GenerateResponse | null;
   onRegenerate?: (req?: GenerateRequest) => Promise<void>;
   originalRequest?: GenerateRequest | null;
+  onSave?: (platform: Platform, content: string, hashtags: string[], cta: string) => Promise<void>;
 }
 
-export function OutputTabs({ response, onRegenerate, originalRequest }: OutputTabsProps) {
+export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: OutputTabsProps) {
   const [activeTab, setActiveTab] = useState<Platform | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [history, setHistory] = useState<GenerationHistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [savedPlatforms, setSavedPlatforms] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Add response to history when it changes
   useEffect(() => {
@@ -105,6 +108,20 @@ export function OutputTabs({ response, onRegenerate, originalRequest }: OutputTa
     if (!output) return;
     const text = `${output.content}\n\n${output.hashtags.join(" ")}`;
     await handleCopy(text, "all");
+  };
+
+  const handleSave = async (output: typeof currentOutput) => {
+    if (!output || !onSave || isSaving) return;
+    setIsSaving(true);
+    try {
+      await onSave(output.platform, output.content, output.hashtags, output.cta);
+      setSavedPlatforms((prev) => [...prev, output.platform]);
+      setTimeout(() => {
+        setSavedPlatforms((prev) => prev.filter((p) => p !== output.platform));
+      }, 3000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -244,25 +261,49 @@ export function OutputTabs({ response, onRegenerate, originalRequest }: OutputTa
             <p className="text-sm text-slate-300">{currentOutput.cta}</p>
           </div>
 
-          {/* Copy all button */}
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full"
-            onClick={() => handleCopyAll(currentOutput)}
-          >
-            {copied === "all" ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-green-400" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" />
-                Copy All Content
-              </>
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="flex-1"
+              onClick={() => handleCopyAll(currentOutput)}
+            >
+              {copied === "all" ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-green-400" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy All
+                </>
+              )}
+            </Button>
+            {onSave && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="flex-1"
+                onClick={() => handleSave(currentOutput)}
+                loading={isSaving}
+                disabled={isSaving}
+              >
+                {savedPlatforms.includes(currentOutput.platform) ? (
+                  <>
+                    <BookmarkCheck className="w-3.5 h-3.5 text-green-400" />
+                    Saved!
+                  </>
+                ) : (
+                  <>
+                    <Bookmark className="w-3.5 h-3.5" />
+                    Save
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
+          </div>
         </div>
       )}
     </div>

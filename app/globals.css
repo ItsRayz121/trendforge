@@ -90,6 +90,18 @@ select:focus {
   outline: none;
 }
 
+/* Force dark theme on all native select elements — overrides Chrome/Windows UA stylesheet */
+select {
+  background-color: #1a1a2e !important;
+  color: #e2e8f0 !important;
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #141420;
+  color: #e2e8f0;
+}
+
 /* Transition defaults */
 .transition-all {
   transition-property: all;

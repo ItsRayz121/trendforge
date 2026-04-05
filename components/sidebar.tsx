@@ -13,6 +13,7 @@ import {
   Settings,
   X,
   Zap,
+  Bookmark,
 } from "lucide-react";
 
 const navItems = [
@@ -25,6 +26,11 @@ const navItems = [
     label: "Content Studio",
     href: "/studio",
     icon: Wand2,
+  },
+  {
+    label: "Saved Content",
+    href: "/saved",
+    icon: Bookmark,
   },
   {
     label: "Trending",
