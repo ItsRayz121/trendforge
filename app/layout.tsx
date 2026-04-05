@@ -3,6 +3,8 @@ import "./globals.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PwaRegister } from "@/components/pwa-register";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "TrendForge — AI Content Creation Platform",
   description:
