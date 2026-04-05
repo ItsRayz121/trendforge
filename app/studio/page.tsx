@@ -43,7 +43,9 @@ function StudioContent() {
     try {
       const saved = JSON.parse(localStorage.getItem("trendforge_settings") || "{}");
       const customKey = saved.openaiKey || "";
-      const savedModel = saved.openaiModel || "";
+      const savedModel = saved.aiProvider === "custom" ? (saved.customModel || "") : (saved.openaiModel || "");
+      // Use providerBaseUrl (new) or fall back to customBaseUrl (old field name)
+      const savedBaseUrl = saved.providerBaseUrl || saved.customBaseUrl || "";
 
       const res = await fetch("/api/generate", {
         method: "POST",
@@ -51,6 +53,7 @@ function StudioContent() {
           "Content-Type": "application/json",
           ...(customKey && { "x-custom-api-key": customKey }),
           ...(savedModel && { "x-ai-model": savedModel }),
+          ...(savedBaseUrl && { "x-base-url": savedBaseUrl }),
         },
         body: JSON.stringify(req),
       });

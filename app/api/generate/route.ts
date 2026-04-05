@@ -13,12 +13,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check for custom key from client headers first, then env
+    // Check for custom key/model/baseUrl from client headers first, then env
     const customApiKey = req.headers.get("x-custom-api-key");
     const customModel = req.headers.get("x-ai-model");
+    const customBaseUrl = req.headers.get("x-base-url");
     const apiKey = customApiKey || process.env.OPENAI_API_KEY;
-    const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
-    const model = customModel || process.env.OPENAI_MODEL || "gpt-4o-mini";
+    const baseUrl = customBaseUrl || process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1";
+    const model = customModel || process.env.OPENAI_MODEL || "google/gemini-2.0-flash-001";
 
     if (apiKey && apiKey !== "your_openai_api_key_here") {
       // OpenRouter/OpenAI generation
