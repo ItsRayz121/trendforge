@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -14,67 +15,52 @@ import {
   X,
   Zap,
   Bookmark,
+  FileBarChart2,
 } from "lucide-react";
 
-const navItems = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "Content Studio",
-    href: "/studio",
-    icon: Wand2,
-  },
-  {
-    label: "Saved Content",
-    href: "/saved",
-    icon: Bookmark,
-  },
-  {
-    label: "Trending",
-    href: "/trends",
-    icon: TrendingUp,
-  },
-  {
-    label: "Trend Analysis",
-    href: "/analytics",
-    icon: BarChart3,
-  },
-  {
-    label: "Image Generator",
-    href: "/image-generator",
-    icon: ImageIcon,
-  },
-  {
-    label: "Scheduler",
-    href: "/scheduler",
-    icon: Calendar,
-  },
-  {
-    label: "Alerts",
-    href: "/alerts",
-    icon: Bell,
-  },
-  {
-    label: "Settings",
-    href: "/settings",
-    icon: Settings,
-  },
-];
-
-interface SidebarProps {
-  open: boolean;
-  onClose: () => void;
+interface NavItem {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  badge?: string;
+  badgeColor?: string;
 }
 
-export function Sidebar({ open, onClose }: SidebarProps) {
+export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const [alertCount, setAlertCount] = useState(0);
+
+  // Poll unread alert count every 60s
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await fetch("/api/alerts");
+        if (res.ok) {
+          const data = await res.json();
+          setAlertCount(data.unreadCount || 0);
+        }
+      } catch {}
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const navItems: NavItem[] = [
+    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Content Studio", href: "/studio", icon: Wand2 },
+    { label: "Saved Content", href: "/saved", icon: Bookmark },
+    { label: "Trending", href: "/trends", icon: TrendingUp, badge: "Live", badgeColor: "text-green-400 bg-green-500/15 border-green-500/20" },
+    { label: "Trend Report", href: "/trend-report", icon: FileBarChart2, badge: "AI", badgeColor: "text-violet-400 bg-violet-500/15 border-violet-500/20" },
+    { label: "Trend Analysis", href: "/analytics", icon: BarChart3 },
+    { label: "Image Generator", href: "/image-generator", icon: ImageIcon },
+    { label: "Scheduler", href: "/scheduler", icon: Calendar },
+    { label: "Alerts", href: "/alerts", icon: Bell },
+    { label: "Settings", href: "/settings", icon: Settings },
+  ];
 
   return (
     <>
-      {/* Mobile overlay */}
       {open && (
         <div
           className="fixed inset-0 bg-black/60 z-30 lg:hidden backdrop-blur-sm"
@@ -82,7 +68,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={cn(
           "fixed left-0 top-0 h-full w-[260px] bg-surface-900 border-r border-surface-700 z-40 flex flex-col transition-transform duration-300",
@@ -90,7 +75,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           open ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        {/* Logo - Clickable to home */}
+        {/* Logo */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-surface-700">
           <Link
             href="/dashboard"
@@ -118,6 +103,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            const isAlerts = item.href === "/alerts";
             return (
               <Link
                 key={item.href}
@@ -137,11 +123,23 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                   )}
                 />
                 <span>{item.label}</span>
-                {item.label === "Trending" && (
-                  <span className="ml-auto text-[10px] bg-green-500/15 text-green-400 border border-green-500/20 rounded-full px-1.5 py-0.5 font-medium">
-                    Live
-                  </span>
-                )}
+                <span className="ml-auto flex items-center gap-1.5">
+                  {/* Unread alerts badge */}
+                  {isAlerts && alertCount > 0 && (
+                    <span className="text-[10px] bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                      {alertCount > 9 ? "9+" : alertCount}
+                    </span>
+                  )}
+                  {/* Static label badges */}
+                  {item.badge && (
+                    <span className={cn(
+                      "text-[10px] border rounded-full px-1.5 py-0.5 font-medium",
+                      item.badgeColor
+                    )}>
+                      {item.badge}
+                    </span>
+                  )}
+                </span>
               </Link>
             );
           })}
