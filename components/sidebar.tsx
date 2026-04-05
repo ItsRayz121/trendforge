@@ -16,6 +16,7 @@ import {
   Zap,
   Bookmark,
   FileBarChart2,
+  Microscope,
 } from "lucide-react";
 
 interface NavItem {
@@ -52,6 +53,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     { label: "Saved Content", href: "/saved", icon: Bookmark },
     { label: "Trending", href: "/trends", icon: TrendingUp, badge: "Live", badgeColor: "text-green-400 bg-green-500/15 border-green-500/20" },
     { label: "Trend Report", href: "/trend-report", icon: FileBarChart2, badge: "AI", badgeColor: "text-violet-400 bg-violet-500/15 border-violet-500/20" },
+    { label: "Research Tools", href: "/research", icon: Microscope, badge: "New", badgeColor: "text-orange-400 bg-orange-500/15 border-orange-500/20" },
     { label: "Trend Analysis", href: "/analytics", icon: BarChart3 },
     { label: "Image Generator", href: "/image-generator", icon: ImageIcon },
     { label: "Scheduler", href: "/scheduler", icon: Calendar },
