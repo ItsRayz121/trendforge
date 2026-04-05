@@ -44,6 +44,7 @@ export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: 
   const [showHistory, setShowHistory] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [savedPlatforms, setSavedPlatforms] = useState<string[]>([]);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Add response to history when it changes
@@ -113,12 +114,16 @@ export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: 
   const handleSave = async (output: typeof currentOutput) => {
     if (!output || !onSave || isSaving) return;
     setIsSaving(true);
+    setSaveError(null);
     try {
       await onSave(output.platform, output.content, output.hashtags, output.cta);
       setSavedPlatforms((prev) => [...prev, output.platform]);
       setTimeout(() => {
         setSavedPlatforms((prev) => prev.filter((p) => p !== output.platform));
       }, 3000);
+    } catch (err: any) {
+      setSaveError(err?.message || "Save failed — check Supabase setup");
+      setTimeout(() => setSaveError(null), 5000);
     } finally {
       setIsSaving(false);
     }
@@ -260,6 +265,13 @@ export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: 
             </p>
             <p className="text-sm text-slate-300">{currentOutput.cta}</p>
           </div>
+
+          {/* Save error */}
+          {saveError && (
+            <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+              {saveError}
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="flex gap-2">

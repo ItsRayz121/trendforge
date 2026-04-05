@@ -103,12 +103,13 @@ export default function SettingsPage() {
   };
 
   const textModels = [
-    { value: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash (Fast, Cheap)", provider: "openrouter" },
+    { value: "deepseek/deepseek-chat", label: "DeepSeek V3 (Fast, Recommended)", provider: "openrouter" },
+    { value: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash", provider: "openrouter" },
     { value: "google/gemini-flash-1.5", label: "Gemini 1.5 Flash", provider: "openrouter" },
     { value: "google/gemini-pro", label: "Gemini Pro", provider: "openrouter" },
+    { value: "deepseek/deepseek-r1", label: "DeepSeek R1 (Reasoning)", provider: "openrouter" },
     { value: "gpt-4o-mini", label: "GPT-4o Mini", provider: "openai" },
     { value: "gpt-4o", label: "GPT-4o (High Quality)", provider: "openai" },
-    { value: "gpt-4-turbo", label: "GPT-4 Turbo", provider: "openai" },
     { value: "claude-3-haiku", label: "Claude 3 Haiku", provider: "anthropic" },
     { value: "claude-3-sonnet", label: "Claude 3 Sonnet", provider: "anthropic" },
   ];

@@ -99,7 +99,7 @@ function StudioContent() {
 
   const handleSave = async (platform: string, content: string, hashtags: string[], cta: string) => {
     if (!lastRequest) return;
-    await fetch("/api/save-content", {
+    const res = await fetch("/api/save-content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -112,6 +112,10 @@ function StudioContent() {
         generated_at: response?.generatedAt,
       }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Save failed");
+    }
   };
 
   const tips = [
