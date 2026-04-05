@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sidebar-width: 260px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #0a0a0f;
+  color: #e2e8f0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #141420;
+}
+::-webkit-scrollbar-thumb {
+  background: #2e2e4a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #7c3aed;
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: linear-gradient(135deg, #a78bfa, #818cf8, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow effects */
+.glow-purple {
+  box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+}
+.glow-purple-sm {
+  box-shadow: 0 0 10px rgba(124, 58, 237, 0.2);
+}
+
+/* Card glass effect */
+.glass-card {
+  background: rgba(20, 20, 32, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(46, 46, 74, 0.6);
+}
+
+/* Shimmer loading */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(46, 46, 74, 0.4) 25%,
+    rgba(124, 58, 237, 0.15) 50%,
+    rgba(46, 46, 74, 0.4) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Input focus ring override */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+
+/* Transition defaults */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Platform color chips */
+.platform-telegram { background: rgba(0, 136, 204, 0.15); color: #29b6f6; border-color: rgba(0, 136, 204, 0.3); }
+.platform-instagram { background: rgba(225, 48, 108, 0.15); color: #f48fb1; border-color: rgba(225, 48, 108, 0.3); }
+.platform-facebook { background: rgba(24, 119, 242, 0.15); color: #64b5f6; border-color: rgba(24, 119, 242, 0.3); }
+.platform-twitter { background: rgba(29, 161, 242, 0.15); color: #81d4fa; border-color: rgba(29, 161, 242, 0.3); }
