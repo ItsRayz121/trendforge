@@ -42,7 +42,7 @@ function StudioContent() {
     setLastRequest(req);
     try {
       const saved = JSON.parse(localStorage.getItem("trendforge_settings") || "{}");
-      const customKey = saved.customApiKey || "";
+      const customKey = saved.openaiKey || "";
       const savedModel = saved.openaiModel || "";
 
       const res = await fetch("/api/generate", {
