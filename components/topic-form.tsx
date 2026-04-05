@@ -35,6 +35,7 @@ export function TopicForm({ onGenerate, loading, initialTopic, initialPlatforms 
   const [showOptimizationModal, setShowOptimizationModal] = useState(false);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [selectedTemplates, setSelectedTemplates] = useState<Partial<Record<Platform, Template | null>>>({});
+  const [activeTemplatePlatform, setActiveTemplatePlatform] = useState<Platform | null>(null);
   const [tempTopic, setTempTopic] = useState("");
 
   // Load settings on mount
@@ -233,64 +234,100 @@ export function TopicForm({ onGenerate, loading, initialTopic, initialPlatforms 
         )}
       </div>
 
-      {/* Template Manager Toggle */}
-      <div className="border border-surface-600 rounded-lg overflow-hidden">
+      {/* Platform Templates — tab layout */}
+      <div className="border border-surface-600 rounded-xl overflow-hidden">
+        {/* Header */}
         <button
           type="button"
-          onClick={() => setShowTemplateManager(!showTemplateManager)}
-          className="w-full px-4 py-3 flex items-center justify-between bg-surface-800 hover:bg-surface-700 transition-colors"
+          onClick={() => {
+            const next = !showTemplateManager;
+            setShowTemplateManager(next);
+            if (next && !activeTemplatePlatform && selectedPlatforms.length > 0) {
+              setActiveTemplatePlatform(selectedPlatforms[0]);
+            }
+          }}
+          className="w-full px-4 py-3 flex items-center justify-between bg-surface-800 hover:bg-surface-750 transition-colors"
         >
-          <div className="flex items-center gap-2">
-            <Settings2 className="w-4 h-4 text-violet-400" />
-            <span className="text-sm font-medium text-slate-200">Platform Templates</span>
-            {Object.values(selectedTemplates).filter(Boolean).length > 0 && (
-              <span className="text-[10px] bg-violet-500/20 text-violet-400 px-1.5 py-0.5 rounded">
-                {Object.values(selectedTemplates).filter(Boolean).length} selected
-              </span>
-            )}
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-violet-500/15 border border-violet-500/20 flex items-center justify-center">
+              <Settings2 className="w-3.5 h-3.5 text-violet-400" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-slate-200">Platform Templates</p>
+              <p className="text-[10px] text-slate-500">
+                {Object.values(selectedTemplates).filter(Boolean).length > 0
+                  ? `${Object.values(selectedTemplates).filter(Boolean).length} template${Object.values(selectedTemplates).filter(Boolean).length > 1 ? "s" : ""} active`
+                  : "Customize AI output per platform"}
+              </p>
+            </div>
           </div>
-          <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showTemplateManager ? "rotate-180" : ""}`} />
+          <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${showTemplateManager ? "rotate-180" : ""}`} />
         </button>
 
-        {showTemplateManager && (
-          <div className="p-4 border-t border-surface-600">
-            <p className="text-xs text-slate-500 mb-4">
-              Select a template for each platform to customize how content is generated.
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {showTemplateManager && selectedPlatforms.length > 0 && (
+          <div className="border-t border-surface-600">
+            {/* Platform tabs */}
+            <div className="flex overflow-x-auto border-b border-surface-600 bg-surface-900/50">
               {selectedPlatforms.map((platform) => {
-                const platformInfo = platforms.find((p) => p.id === platform);
-                const selectedTemplate = selectedTemplates[platform];
+                const p = platforms.find((x) => x.id === platform);
+                const hasTemplate = !!selectedTemplates[platform];
+                const isActive = activeTemplatePlatform === platform;
                 return (
-                  <div key={platform} className="border border-surface-600 rounded-lg p-3 bg-surface-800">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-base">{platformInfo?.icon}</span>
-                      <span className="text-sm font-medium text-slate-300">{platformInfo?.label}</span>
-                    </div>
-                    {selectedTemplate ? (
-                      <div className="p-2 rounded bg-violet-500/10 border border-violet-500/20">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-violet-300 font-medium">{selectedTemplate.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleTemplateSelect(platform, selectedTemplate)}
-                            className="text-slate-500 hover:text-red-400"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <TemplateManager
-                        selectedPlatform={platform}
-                        onSelectTemplate={(template) => handleTemplateSelect(platform, template)}
-                        currentTemplate={selectedTemplates[platform]}
-                      />
+                  <button
+                    key={platform}
+                    type="button"
+                    onClick={() => setActiveTemplatePlatform(platform)}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-all duration-200 flex-shrink-0",
+                      isActive
+                        ? "border-violet-500 text-violet-300 bg-violet-500/5"
+                        : "border-transparent text-slate-500 hover:text-slate-300 hover:bg-surface-700"
                     )}
-                  </div>
+                  >
+                    <span className="text-base leading-none">{p?.icon}</span>
+                    <span>{p?.label}</span>
+                    {hasTemplate && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                    )}
+                  </button>
                 );
               })}
             </div>
+
+            {/* Active platform template panel */}
+            {activeTemplatePlatform && (
+              <div className="p-4">
+                {/* Active template badge */}
+                {selectedTemplates[activeTemplatePlatform] && (
+                  <div className="flex items-center justify-between mb-3 px-3 py-2 rounded-lg bg-violet-500/10 border border-violet-500/25">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                      <span className="text-xs font-medium text-violet-300">
+                        Active: {selectedTemplates[activeTemplatePlatform]?.name}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleTemplateSelect(activeTemplatePlatform, selectedTemplates[activeTemplatePlatform]!)}
+                      className="text-slate-500 hover:text-red-400 transition-colors p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                <TemplateManager
+                  selectedPlatform={activeTemplatePlatform}
+                  onSelectTemplate={(template) => handleTemplateSelect(activeTemplatePlatform, template)}
+                  currentTemplate={selectedTemplates[activeTemplatePlatform]}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {showTemplateManager && selectedPlatforms.length === 0 && (
+          <div className="p-6 text-center border-t border-surface-600">
+            <p className="text-xs text-slate-500">Select at least one platform above to manage templates.</p>
           </div>
         )}
       </div>
