@@ -23,7 +23,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
 Textarea.displayName = "Textarea";
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
-  ({ className, children, ...props }, ref) => (
+  ({ className, style, children, ...props }, ref) => (
     <select
       ref={ref}
       className={cn(
@@ -32,6 +32,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
         "[color-scheme:dark] [&>option]:bg-[#141420] [&>option]:text-slate-200",
         className
       )}
+      style={{ backgroundColor: "#1a1a2e", color: "#e2e8f0", colorScheme: "dark", ...style }}
       {...props}
     >
       {children}
