@@ -134,7 +134,7 @@ function StudioContent() {
       title="Content Studio"
       subtitle="AI-powered content generator for all platforms"
     >
-      <div className="grid lg:grid-cols-[380px_1fr] xl:grid-cols-[420px_1fr] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] xl:grid-cols-[420px_1fr] gap-4 sm:gap-6">
         {/* Left: Form */}
         <div className="space-y-5">
           <Card>

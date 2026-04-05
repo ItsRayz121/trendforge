@@ -35,9 +35,9 @@ export function Header({ onMenuToggle, title, subtitle }: HeaderProps) {
           </Link>
 
           {title && !title.includes("Dashboard") && (
-            <div className="hidden sm:block border-l border-surface-600 pl-3">
-              <h1 className="text-sm font-semibold text-slate-200">{title}</h1>
-              {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+            <div className="border-l border-surface-600 pl-3">
+              <h1 className="text-sm font-semibold text-slate-200 leading-tight">{title}</h1>
+              {subtitle && <p className="text-xs text-slate-500 hidden sm:block">{subtitle}</p>}
             </div>
           )}
         </div>

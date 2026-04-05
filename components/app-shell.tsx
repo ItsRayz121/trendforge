@@ -13,7 +13,7 @@ export function AppShell({ children, title, subtitle }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-surface-950 text-slate-200">
+    <div className="min-h-screen bg-surface-950 text-slate-200 overflow-x-hidden">
       {/* Sidebar */}
       <Sidebar
         open={sidebarOpen}
@@ -21,13 +21,13 @@ export function AppShell({ children, title, subtitle }: AppShellProps) {
       />
 
       {/* Main content area */}
-      <div className="lg:pl-[260px] flex flex-col min-h-screen">
+      <div className="lg:pl-[260px] flex flex-col min-h-screen min-w-0">
         <Header
           onMenuToggle={() => setSidebarOpen(true)}
           title={title}
           subtitle={subtitle}
         />
-        <main className="flex-1 p-4 lg:p-6 max-w-screen-2xl w-full mx-auto">
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 max-w-screen-2xl w-full mx-auto min-w-0">
           {children}
         </main>
       </div>

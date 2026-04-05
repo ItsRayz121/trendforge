@@ -196,7 +196,7 @@ export default function AlertsPage() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-[300px_1fr] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 sm:gap-6">
           {/* Left: Keyword Manager */}
           <div className="space-y-4">
             <Card>

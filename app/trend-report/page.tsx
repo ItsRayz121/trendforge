@@ -257,7 +257,7 @@ export default function TrendReportPage() {
             </Card>
 
             {/* Content Formats + Posting Times */}
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               {/* Best Content Formats */}
               <Card>
                 <CardHeader>

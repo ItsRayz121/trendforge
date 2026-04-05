@@ -105,6 +105,31 @@ select option {
   color: #e2e8f0;
 }
 
+/* ── Mobile fixes ─────────────────────────────────────────── */
+
+/* Prevent any element from causing horizontal scroll */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Better touch targets on mobile */
+@media (max-width: 640px) {
+  button, a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Prevent text from overflowing cards */
+  .truncate { max-width: 100%; }
+
+  /* Tables always scrollable on mobile */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 /* Transition defaults */
 .transition-all {
   transition-property: all;

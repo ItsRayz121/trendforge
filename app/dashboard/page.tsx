@@ -117,7 +117,7 @@ export default function DashboardPage() {
     <AppShell title="Dashboard" subtitle="Welcome back, Creator">
       <div className="space-y-6">
         {/* Stats row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {statsConfig.map((stat) => {
             const Icon = stat.icon;
             return (
@@ -140,7 +140,7 @@ export default function DashboardPage() {
         {/* Quick Actions */}
         <div>
           <h2 className="text-sm font-semibold text-slate-300 mb-3">Quick Actions</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (
@@ -162,7 +162,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Bottom grid */}
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Trending now */}
           <Card>
             <CardHeader>

@@ -274,7 +274,7 @@ export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: 
           )}
 
           {/* Action buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button
               variant="secondary"
               size="sm"
