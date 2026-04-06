@@ -1,17 +1,13 @@
 /**
- * Shared AI client — automatically picks the best available provider:
- *   1. DeepSeek v3.2 via AgentRouter  (ANTHROPIC_API_KEY)  ← primary
- *   2. Gemini 2.0 Flash via OpenRouter (OPENAI_API_KEY)    ← fallback
- *
- * Perplexity Sonar (real-time search) is handled separately in lib/perplexity.ts
- * and always uses OPENAI_API_KEY + OpenRouter regardless of this config.
+ * Shared AI client — uses Gemini 2.0 Flash via OpenRouter for all generation/reasoning.
+ * Perplexity Sonar (real-time search) is handled separately in lib/perplexity.ts.
  */
 
 export interface AIConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
-  provider: "agentrouter" | "openrouter" | "none";
+  provider: "openrouter" | "none";
 }
 
 export interface AIMessage {
@@ -27,24 +23,8 @@ export interface AICallOptions {
 
 /** Get the active AI provider config */
 export function getAIConfig(): AIConfig {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
 
-  // Priority 1: AgentRouter (DeepSeek)
-  if (anthropicKey && anthropicKey !== "your_anthropic_api_key_here") {
-    const rawBase = process.env.ANTHROPIC_BASE_URL || "https://agentrouter.org/";
-    const base = rawBase.replace(/\/$/, "");
-    // Ensure /v1 is in the path
-    const baseUrl = base.endsWith("/v1") ? base : `${base}/v1`;
-    return {
-      apiKey: anthropicKey,
-      baseUrl,
-      model: process.env.ANTHROPIC_MODEL || "deepseek-v3.2",
-      provider: "agentrouter",
-    };
-  }
-
-  // Priority 2: OpenRouter (Gemini)
   if (openaiKey && openaiKey !== "your_openai_api_key_here") {
     return {
       apiKey: openaiKey,
@@ -79,7 +59,6 @@ export async function callAI(options: AICallOptions): Promise<string | null> {
     max_tokens: maxTokens,
   };
 
-  // JSON mode — both DeepSeek and Gemini support this
   if (jsonMode) {
     body.response_format = { type: "json_object" };
   }
@@ -90,11 +69,8 @@ export async function callAI(options: AICallOptions): Promise<string | null> {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${config.apiKey}`,
-        // OpenRouter-specific headers
-        ...(config.provider === "openrouter" && {
-          "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://trendforge-enlq.vercel.app",
-          "X-Title": "TrendForge",
-        }),
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://trendforge-enlq.vercel.app",
+        "X-Title": "TrendForge",
       },
       body: JSON.stringify(body),
     });
