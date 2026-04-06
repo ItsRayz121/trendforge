@@ -69,6 +69,7 @@ export default function ImageGeneratorPage() {
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [savedToContent, setSavedToContent] = useState(false);
   const [imageHistory, setImageHistory] = useState<ImageHistoryItem[]>([]);
 
   useEffect(() => {
@@ -140,6 +141,26 @@ export default function ImageGeneratorPage() {
     await copyToClipboard(text);
     setCopied(key);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handleSaveToSavedContent = async () => {
+    if (!generatedImageUrl || !result) return;
+    try {
+      const res = await fetch("/api/save-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic,
+          platform,
+          content: `🖼️ AI Generated Image\n\nPrompt: ${result.prompt}\n\nImage URL: ${generatedImageUrl}`,
+          hashtags: [],
+          cta: "",
+          char_count: result.prompt.length,
+          generated_at: new Date().toISOString(),
+        }),
+      });
+      if (res.ok) setSavedToContent(true);
+    } catch { /* ignore */ }
   };
 
   const handleSaveToLibrary = async () => {
@@ -409,7 +430,19 @@ export default function ImageGeneratorPage() {
                           {saved ? (
                             <><BookmarkCheck className="w-3.5 h-3.5 text-green-400" /> Saved</>
                           ) : (
-                            <><Bookmark className="w-3.5 h-3.5" /> Save</>
+                            <><Bookmark className="w-3.5 h-3.5" /> Save Image</>
+                          )}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleSaveToSavedContent}
+                          disabled={savedToContent}
+                        >
+                          {savedToContent ? (
+                            <><BookmarkCheck className="w-3.5 h-3.5 text-green-400" /> Saved to Library</>
+                          ) : (
+                            <><Bookmark className="w-3.5 h-3.5" /> Save to Content</>
                           )}
                         </Button>
                       </>
