@@ -85,20 +85,17 @@ export default function DashboardPage() {
   const [recentContent, setRecentContent] = useState<SavedContentItem[]>([]);
 
   useEffect(() => {
-    // Local stats
-    const history = JSON.parse(localStorage.getItem("trendforge_gen_history") || "[]");
-    const alerts = JSON.parse(localStorage.getItem("trendforge_alerts") || "[]");
-
-    // Supabase stats + recent saved content
     Promise.all([
       supabase.from("saved_content").select("*", { count: "exact" }).order("saved_at", { ascending: false }).limit(3),
       supabase.from("scheduled_posts").select("id", { count: "exact" }).eq("status", "scheduled"),
-    ]).then(([savedRes, scheduledRes]) => {
+      supabase.from("content_generations").select("id", { count: "exact" }),
+      supabase.from("keyword_alerts").select("id", { count: "exact" }),
+    ]).then(([savedRes, scheduledRes, generatedRes, alertsRes]) => {
       setStats({
-        generated: history.length,
+        generated: generatedRes.count ?? 0,
         saved: savedRes.count ?? 0,
         scheduled: scheduledRes.count ?? 0,
-        alerts: alerts.length,
+        alerts: alertsRes.count ?? 0,
       });
       if (savedRes.data) {
         setRecentContent(savedRes.data as SavedContentItem[]);
