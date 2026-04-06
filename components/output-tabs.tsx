@@ -223,6 +223,7 @@ export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: 
               <button
                 onClick={() => handleCopy(currentOutput.content, "content")}
                 className="p-1.5 rounded-lg bg-surface-600 border border-surface-400 text-slate-400 hover:text-slate-200 transition-colors"
+                title="Copy content"
               >
                 {copied === "content" ? (
                   <Check className="w-3.5 h-3.5 text-green-400" />
@@ -230,6 +231,20 @@ export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: 
                   <Copy className="w-3.5 h-3.5" />
                 )}
               </button>
+              {onSave && (
+                <button
+                  onClick={() => handleSave(currentOutput)}
+                  className="p-1.5 rounded-lg bg-surface-600 border border-surface-400 text-slate-400 hover:text-violet-400 transition-colors"
+                  title="Save to library"
+                  disabled={isSaving}
+                >
+                  {savedPlatforms.includes(currentOutput.platform) ? (
+                    <BookmarkCheck className="w-3.5 h-3.5 text-green-400" />
+                  ) : (
+                    <Bookmark className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
 

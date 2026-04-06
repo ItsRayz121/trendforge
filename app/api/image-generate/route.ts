@@ -13,10 +13,21 @@ const ratioToSize: Record<string, { width: number; height: number }> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, ratio = "square", style = "", topic = "" } = await req.json();
+    const { prompt, ratio = "square", style = "", topic = "", saveOnly = false, imageUrl: existingUrl } = await req.json();
 
     if (!prompt) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 });
+    }
+
+    // Save-only mode: just persist an already-generated image URL
+    if (saveOnly && existingUrl) {
+      await supabase.from("generated_images").insert({
+        topic: topic || prompt.slice(0, 100),
+        prompt,
+        image_url: existingUrl,
+        style: style || ratio,
+      });
+      return NextResponse.json({ saved: true });
     }
 
     const { width, height } = ratioToSize[ratio] ?? ratioToSize.square;

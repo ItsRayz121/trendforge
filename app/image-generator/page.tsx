@@ -145,7 +145,7 @@ export default function ImageGeneratorPage() {
   const handleSaveToLibrary = async () => {
     if (!generatedImageUrl || !result) return;
     try {
-      await fetch("/api/image-generate", {
+      const res = await fetch("/api/image-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -154,9 +154,10 @@ export default function ImageGeneratorPage() {
           style: visualStyle,
           topic,
           saveOnly: true,
+          imageUrl: generatedImageUrl,
         }),
       });
-      setSaved(true);
+      if (res.ok) setSaved(true);
     } catch {
       setSaved(true); // optimistic
     }
