@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Trend, TrendAnalysis } from "@/lib/types";
 import { searchWeb } from "@/lib/perplexity";
+import { callAIJson, hasAIProvider } from "@/lib/ai-client";
 
 export const dynamic = "force-dynamic";
 
@@ -11,11 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "trend is required" }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    const baseUrl = process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1";
-    const model = process.env.OPENAI_MODEL || "google/gemini-2.0-flash-001";
-
-    if (!apiKey || apiKey === "your_openai_api_key_here") {
+    if (!hasAIProvider()) {
       return NextResponse.json(getFallbackAnalysis(trend));
     }
 
@@ -56,44 +53,13 @@ Return ONLY valid JSON with this exact structure:
 
 viralityScore must be a number 1-100. bestPlatforms must only contain values from: twitter, instagram, facebook, telegram, linkedin. contentAngles must have exactly 4 items. Be specific and actionable, not generic.`;
 
-    const aiRes = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        ...(baseUrl.includes("openrouter") && {
-          "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://trendforge-enlq.vercel.app",
-          "X-Title": "TrendForge",
-        }),
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        max_tokens: 1000,
-      }),
+    const parsed = await callAIJson<any>({
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 1000,
+      jsonMode: true,
     });
 
-    if (!aiRes.ok) {
-      console.warn("analyze-trend AI error:", aiRes.status);
-      return NextResponse.json(getFallbackAnalysis(trend));
-    }
-
-    const aiData = await aiRes.json();
-    let raw = aiData.choices?.[0]?.message?.content || "{}";
-    raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-
-    let parsed: any = {};
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      const m = raw.match(/\{[\s\S]*\}/);
-      if (m) {
-        try { parsed = JSON.parse(m[0]); } catch {}
-      }
-    }
-
-    if (!parsed.whyTrending) {
+    if (!parsed?.whyTrending) {
       return NextResponse.json(getFallbackAnalysis(trend));
     }
 

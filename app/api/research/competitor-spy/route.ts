@@ -21,7 +21,9 @@ export async function POST(req: NextRequest) {
     );
     if (webInfo) newsContext = `\nReal-time web context about them: ${webInfo}`;
 
-    if (!apiKey || apiKey === "your_openai_api_key_here") {
+    const { callAIJson, hasAIProvider } = await import("@/lib/ai-client");
+
+    if (!hasAIProvider()) {
       return NextResponse.json(getDemoAnalysis(cleanHandle, platform));
     }
 
@@ -52,30 +54,14 @@ Return ONLY valid JSON:
 
 Return exactly 4 topTopics, 3 contentTypes, 3 strengths, 2 weaknesses, 2 opportunities. Be realistic and specific.`;
 
-    const aiRes = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        ...(baseUrl.includes("openrouter") && { "HTTP-Referer": "http://localhost:3000" }),
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        max_tokens: 1500,
-      }),
+    const result = await callAIJson<any>({
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 1500,
+      jsonMode: true,
     });
 
-    if (!aiRes.ok) return NextResponse.json(getDemoAnalysis(cleanHandle, platform));
-
-    const aiData = await aiRes.json();
-    const raw = aiData.choices?.[0]?.message?.content || "{}";
-    try {
-      return NextResponse.json(JSON.parse(raw));
-    } catch {
-      return NextResponse.json(getDemoAnalysis(cleanHandle, platform));
-    }
+    if (!result) return NextResponse.json(getDemoAnalysis(cleanHandle, platform));
+    return NextResponse.json(result);
   } catch (err) {
     console.error("competitor-spy error:", err);
     return NextResponse.json({ error: "Analysis failed" }, { status: 500 });

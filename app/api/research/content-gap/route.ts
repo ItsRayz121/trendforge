@@ -26,7 +26,9 @@ export async function POST(req: NextRequest) {
         .slice(0, 10);
     }
 
-    if (!apiKey || apiKey === "your_openai_api_key_here") {
+    const { callAIJson, hasAIProvider } = await import("@/lib/ai-client");
+
+    if (!hasAIProvider()) {
       return NextResponse.json(getDemoGaps(niche, country));
     }
 
@@ -64,30 +66,14 @@ Return ONLY valid JSON:
 
 Return exactly 6 content gaps, ordered by gap score descending. Be highly specific — not generic.`;
 
-    const aiRes = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        ...(baseUrl.includes("openrouter") && { "HTTP-Referer": "http://localhost:3000" }),
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        max_tokens: 2000,
-      }),
+    const result = await callAIJson<any>({
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 2000,
+      jsonMode: true,
     });
 
-    if (!aiRes.ok) return NextResponse.json(getDemoGaps(niche, country));
-
-    const aiData = await aiRes.json();
-    const raw = aiData.choices?.[0]?.message?.content || "{}";
-    try {
-      return NextResponse.json(JSON.parse(raw));
-    } catch {
-      return NextResponse.json(getDemoGaps(niche, country));
-    }
+    if (!result) return NextResponse.json(getDemoGaps(niche, country));
+    return NextResponse.json(result);
   } catch (err) {
     console.error("content-gap error:", err);
     return NextResponse.json({ error: "Analysis failed" }, { status: 500 });

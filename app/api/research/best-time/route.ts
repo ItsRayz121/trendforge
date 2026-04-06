@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { callAIJson, hasAIProvider } from "@/lib/ai-client";
 
 export const dynamic = "force-dynamic";
 
@@ -11,11 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "niche and platforms are required" }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    const baseUrl = process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1";
-    const model = process.env.OPENAI_MODEL || "google/gemini-2.0-flash-001";
-
-    if (!apiKey || apiKey === "your_openai_api_key_here") {
+    if (!hasAIProvider()) {
       return NextResponse.json(getDemoTimes(niche, country, platforms));
     }
 
@@ -49,30 +46,14 @@ Return ONLY valid JSON:
 
 For each platform in [${platforms.join(", ")}], provide a heatmap with the 8 best time slots across the week (different days and hours). Score 0-100. Be specific to the ${niche} niche and ${country} audience.`;
 
-    const aiRes = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        ...(baseUrl.includes("openrouter") && { "HTTP-Referer": "http://localhost:3000" }),
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        max_tokens: 2000,
-      }),
+    const result = await callAIJson<any>({
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 2000,
+      jsonMode: true,
     });
 
-    if (!aiRes.ok) return NextResponse.json(getDemoTimes(niche, country, platforms));
-
-    const aiData = await aiRes.json();
-    const raw = aiData.choices?.[0]?.message?.content || "{}";
-    try {
-      return NextResponse.json(JSON.parse(raw));
-    } catch {
-      return NextResponse.json(getDemoTimes(niche, country, platforms));
-    }
+    if (!result) return NextResponse.json(getDemoTimes(niche, country, platforms));
+    return NextResponse.json(result);
   } catch (err) {
     console.error("best-time error:", err);
     return NextResponse.json({ error: "Analysis failed" }, { status: 500 });

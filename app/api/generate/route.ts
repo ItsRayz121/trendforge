@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateContent } from "@/lib/ai";
+import { getAIConfig } from "@/lib/ai-client";
 import type { GenerateRequest } from "@/lib/types";
 
 /** Pull a string field from an object, trying multiple key spellings */
@@ -39,11 +40,14 @@ export async function POST(req: NextRequest) {
     const customApiKey = req.headers.get("x-custom-api-key");
     const customModel = req.headers.get("x-ai-model");
     const customBaseUrl = req.headers.get("x-base-url");
-    const apiKey = customApiKey || process.env.OPENAI_API_KEY;
-    const baseUrl = customBaseUrl || process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1";
-    const model = customModel || process.env.OPENAI_MODEL || "google/gemini-2.0-flash-001";
 
-    if (apiKey && apiKey !== "your_openai_api_key_here") {
+    // Use custom headers if provided, else use best available provider (DeepSeek > Gemini)
+    const aiConfig = getAIConfig();
+    const apiKey = customApiKey || aiConfig.apiKey;
+    const baseUrl = customBaseUrl || aiConfig.baseUrl;
+    const model = customModel || aiConfig.model;
+
+    if (apiKey) {
       const outputs = await Promise.all(
         body.platforms.map(async (platform) => {
           const platformRules: Record<string, string> = {

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { callAIJson, hasAIProvider } from "@/lib/ai-client";
+import { searchWeb } from "@/lib/perplexity";
 
 export const dynamic = "force-dynamic";
 
@@ -27,38 +29,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ...cached.report, cached: true, generatedAt: cached.generated_at });
     }
 
-    // Fetch latest headlines for this niche
+    // Fetch latest headlines via Perplexity (real-time) or demo fallback
     let headlines: string[] = [];
-    const gnewsKey = process.env.GNEWS_API_KEY;
-
-    if (gnewsKey && gnewsKey !== "your_gnews_api_key_here") {
-      const params = new URLSearchParams({
-        apikey: gnewsKey,
-        lang: "en",
-        max: "10",
-        topic: niche.toLowerCase(),
-        country: country.toLowerCase(),
-      });
-      const res = await fetch(`https://gnews.io/api/v4/top-headlines?${params}`, {
-        next: { revalidate: 0 },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        headlines = (data.articles || []).map((a: any) => a.title).filter(Boolean);
-      }
+    const webHeadlines = await searchWeb(
+      `Search the web for the top 10 trending news headlines in the "${niche}" niche in ${country} right now. List only the headlines, one per line.`,
+      { maxTokens: 400 }
+    );
+    if (webHeadlines) {
+      headlines = webHeadlines
+        .split("\n")
+        .map((l) => l.replace(/^[-*\d.)\s]+/, "").trim())
+        .filter((l) => l.length > 10)
+        .slice(0, 10);
     }
 
-    // Use demo headlines if no GNews
     if (headlines.length === 0) {
       headlines = getDemoHeadlines(niche);
     }
 
-    // Generate AI report
-    const apiKey = process.env.OPENAI_API_KEY;
-    const baseUrl = process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1";
-    const model = process.env.OPENAI_MODEL || "google/gemini-2.0-flash-001";
-
-    if (!apiKey || apiKey === "your_openai_api_key_here") {
+    if (!hasAIProvider()) {
       const demo = getDemoReport(niche, country);
       return NextResponse.json({ ...demo, cached: false, generatedAt: new Date().toISOString() });
     }
@@ -87,34 +76,11 @@ Return ONLY valid JSON in this exact format:
 
 Return exactly 5 topTopics, 4 contentFormats, 4 postingTimes entries, and 8 hashtags.`;
 
-    const aiRes = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        ...(baseUrl.includes("openrouter") && { "HTTP-Referer": "http://localhost:3000" }),
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        max_tokens: 2000,
-      }),
-    });
-
-    if (!aiRes.ok) {
-      const demo = getDemoReport(niche, country);
-      return NextResponse.json({ ...demo, cached: false, generatedAt: new Date().toISOString() });
-    }
-
-    const aiData = await aiRes.json();
-    const raw = aiData.choices?.[0]?.message?.content || "{}";
-    let report: any = {};
-    try {
-      report = JSON.parse(raw);
-    } catch {
-      report = getDemoReport(niche, country);
-    }
+    const report = await callAIJson<any>({
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 2000,
+      jsonMode: true,
+    }) ?? getDemoReport(niche, country);
 
     // Cache to Supabase
     await supabase.from("trend_reports").insert({
