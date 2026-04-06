@@ -129,6 +129,11 @@ Respond with this JSON and nothing else:
           const hashtags = Array.isArray(parsed.hashtags) ? parsed.hashtags : [];
           const cta = extractField(parsed, "cta", "call_to_action", "callToAction");
 
+          // If AI returned empty content, log the raw response for debugging
+          if (!content) {
+            console.warn(`[generate] Empty content for ${platform}. Raw response:`, raw.slice(0, 500));
+          }
+
           return {
             platform,
             content,
@@ -138,6 +143,14 @@ Respond with this JSON and nothing else:
           };
         })
       );
+
+      // If all outputs came back empty, fall through to mock generation
+      const anyContent = outputs.some((o) => o.content.trim().length > 0);
+      if (!anyContent) {
+        console.warn("[generate] All AI outputs empty — falling back to mock");
+        const mock = await generateContent(body);
+        return NextResponse.json(mock);
+      }
 
       return NextResponse.json({
         outputs,

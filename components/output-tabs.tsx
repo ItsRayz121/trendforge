@@ -215,9 +215,16 @@ export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: 
           {/* Main content */}
           <div className="relative group">
             <div className="bg-surface-700 border border-surface-500 rounded-xl p-4 min-h-[160px]">
-              <pre className="text-sm text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">
-                {currentOutput.content}
-              </pre>
+              {currentOutput.content ? (
+                <pre className="text-sm text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">
+                  {currentOutput.content}
+                </pre>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-32 text-center gap-2">
+                  <p className="text-sm text-amber-400">AI returned no content for this platform.</p>
+                  <p className="text-xs text-slate-500">Try regenerating or changing the topic.</p>
+                </div>
+              )}
             </div>
             <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1.5">
               <button
