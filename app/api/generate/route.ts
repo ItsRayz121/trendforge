@@ -70,7 +70,13 @@ Platform rules:
             const contentMatch = raw.match(/"content"\s*:\s*"([\s\S]*?)(?:"|$)/);
             parsed = { content: contentMatch?.[1] || raw.slice(0, 500), hashtags: [], cta: "" };
           }
-          return { platform, ...parsed, charCount: parsed.content?.length || 0 };
+          return {
+            platform,
+            ...parsed,
+            hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : [],
+            cta: parsed.cta || "",
+            charCount: parsed.content?.length || 0,
+          };
         })
       );
 

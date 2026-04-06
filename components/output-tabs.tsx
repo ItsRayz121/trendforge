@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { GenerateResponse, Platform, GenerateRequest } from "@/lib/types";
 import { getPlatformBg, copyToClipboard } from "@/lib/utils";
-import { Copy, Check, Download, RefreshCw, History, ChevronDown, ChevronUp, Bookmark, BookmarkCheck } from "lucide-react";
+import { Copy, Check, RefreshCw, History, ChevronDown, ChevronUp, Bookmark, BookmarkCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const platformIcons: Record<Platform, string> = {
@@ -94,7 +94,7 @@ export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: 
     }
   };
 
-  const switchToVersion = (item: GenerationHistoryItem) => {
+  const switchToVersion = (_item: GenerationHistoryItem) => {
     // This would need to be passed to parent component
     // For now, we'll store the current view state
   };
@@ -107,7 +107,8 @@ export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: 
 
   const handleCopyAll = async (output: typeof currentOutput) => {
     if (!output) return;
-    const text = `${output.content}\n\n${output.hashtags.join(" ")}`;
+    const tags = Array.isArray(output.hashtags) ? output.hashtags : [];
+    const text = `${output.content}\n\n${tags.join(" ")}`;
     await handleCopy(text, "all");
   };
 
@@ -241,11 +242,11 @@ export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: 
           </div>
 
           {/* Hashtags */}
-          {currentOutput.hashtags.length > 0 && (
+          {(currentOutput.hashtags ?? []).length > 0 && (
             <div>
               <p className="text-xs text-slate-500 mb-2">Hashtags</p>
               <div className="flex flex-wrap gap-1.5">
-                {currentOutput.hashtags.map((tag) => (
+                {(currentOutput.hashtags ?? []).map((tag) => (
                   <button
                     key={tag}
                     onClick={() => handleCopy(tag, tag)}
@@ -263,7 +264,7 @@ export function OutputTabs({ response, onRegenerate, originalRequest, onSave }: 
             <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider">
               Call to Action
             </p>
-            <p className="text-sm text-slate-300">{currentOutput.cta}</p>
+            <p className="text-sm text-slate-300">{currentOutput.cta || "—"}</p>
           </div>
 
           {/* Save error */}
