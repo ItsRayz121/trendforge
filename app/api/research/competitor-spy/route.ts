@@ -12,20 +12,14 @@ export async function POST(req: NextRequest) {
     const baseUrl = process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1";
     const model = process.env.OPENAI_MODEL || "google/gemini-2.0-flash-001";
 
-    // Fetch recent news about this brand/handle for extra context
+    // Fetch real-time context about this brand/handle via Perplexity
     let newsContext = "";
-    const gnewsKey = process.env.GNEWS_API_KEY;
-    if (gnewsKey && gnewsKey !== "your_gnews_api_key_here") {
-      try {
-        const params = new URLSearchParams({ apikey: gnewsKey, lang: "en", max: "5", q: cleanHandle });
-        const newsRes = await fetch(`https://gnews.io/api/v4/search?${params}`);
-        if (newsRes.ok) {
-          const newsData = await newsRes.json();
-          const headlines = (newsData.articles || []).map((a: any) => a.title).slice(0, 5);
-          if (headlines.length > 0) newsContext = `\nRecent news about them: ${headlines.join(" | ")}`;
-        }
-      } catch {}
-    }
+    const { searchWeb } = await import("@/lib/perplexity");
+    const webInfo = await searchWeb(
+      `Search the web for recent news, social media posts, and public information about "${cleanHandle}" on ${platform}. What are they known for? Any recent activity or news in the last 30 days? Summarize briefly.`,
+      { maxTokens: 250 }
+    );
+    if (webInfo) newsContext = `\nReal-time web context about them: ${webInfo}`;
 
     if (!apiKey || apiKey === "your_openai_api_key_here") {
       return NextResponse.json(getDemoAnalysis(cleanHandle, platform));

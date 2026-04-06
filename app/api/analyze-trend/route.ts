@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Trend, TrendAnalysis } from "@/lib/types";
+import { searchWeb } from "@/lib/perplexity";
 
 export const dynamic = "force-dynamic";
 
@@ -18,31 +19,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(getFallbackAnalysis(trend));
     }
 
-    // Also try to enrich with latest news context
-    let newsContext = "";
-    const gnewsKey = process.env.GNEWS_API_KEY;
-    if (gnewsKey && gnewsKey !== "your_gnews_api_key_here") {
-      try {
-        const params = new URLSearchParams({
-          apikey: gnewsKey,
-          lang: "en",
-          max: "5",
-          q: trend.title,
-        });
-        const newsRes = await fetch(`https://gnews.io/api/v4/search?${params}`, {
-          next: { revalidate: 0 },
-        });
-        if (newsRes.ok) {
-          const newsData = await newsRes.json();
-          const headlines = (newsData.articles || [])
-            .map((a: any) => `"${a.title}" — ${a.source?.name}`)
-            .slice(0, 4)
-            .join("\n");
-          if (headlines) {
-            newsContext = `\n\nLive news headlines about this trend:\n${headlines}`;
-          }
-        }
-      } catch {}
+    // Enrich with real-time web context via Perplexity
+    let liveContext = "";
+    const webContext = await searchWeb(
+      `Search the web for the latest news, discussions, and social media reactions about "${trend.title}" from the last 24-48 hours. Summarize in 3-4 sentences what people are saying and why it's getting attention right now.`,
+      { maxTokens: 300 }
+    );
+    if (webContext) {
+      liveContext = `\n\nLive web context (searched right now):\n${webContext}`;
     }
 
     const prompt = `You are a viral content strategist and social media expert. Analyze this trending topic and provide deep, actionable insights for content creators.
@@ -51,7 +35,7 @@ Trend: "${trend.title}"
 Summary: ${trend.summary || "N/A"}
 Category: ${trend.category}
 Country: ${trend.country}
-Published: ${trend.publishedAt}${newsContext}
+Published: ${trend.publishedAt}${liveContext}
 
 Return ONLY valid JSON with this exact structure:
 {

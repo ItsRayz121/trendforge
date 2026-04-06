@@ -11,22 +11,19 @@ export async function POST(req: NextRequest) {
     const baseUrl = process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1";
     const model = process.env.OPENAI_MODEL || "google/gemini-2.0-flash-001";
 
-    // Fetch trending headlines to ground the AI
+    // Fetch real-time trending topics for this niche via Perplexity
     let trendingHeadlines: string[] = [];
-    const gnewsKey = process.env.GNEWS_API_KEY;
-    if (gnewsKey && gnewsKey !== "your_gnews_api_key_here") {
-      try {
-        const params = new URLSearchParams({
-          apikey: gnewsKey, lang: "en", max: "10",
-          topic: niche.toLowerCase(),
-          ...(country && { country: country.toLowerCase() }),
-        });
-        const res = await fetch(`https://gnews.io/api/v4/top-headlines?${params}`);
-        if (res.ok) {
-          const data = await res.json();
-          trendingHeadlines = (data.articles || []).map((a: any) => a.title).filter(Boolean);
-        }
-      } catch {}
+    const { searchWeb } = await import("@/lib/perplexity");
+    const webTrends = await searchWeb(
+      `Search the web RIGHT NOW for the top 10 trending topics and discussions in the "${niche}" niche in ${country || "worldwide"} today. List just the topic titles or headlines, one per line.`,
+      { maxTokens: 400 }
+    );
+    if (webTrends) {
+      trendingHeadlines = webTrends
+        .split("\n")
+        .map((l) => l.replace(/^[-*\d.)\s]+/, "").trim())
+        .filter((l) => l.length > 10)
+        .slice(0, 10);
     }
 
     if (!apiKey || apiKey === "your_openai_api_key_here") {
