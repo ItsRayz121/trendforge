@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { PwaRegister } from "@/components/pwa-register";
+import { ToastProvider } from "@/components/toast-provider";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export default function RootLayout({
       </head>
       <body>
         {children}
+        <ToastProvider />
         <PwaRegister />
         <SpeedInsights />
       </body>

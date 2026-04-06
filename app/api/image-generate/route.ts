@@ -3,6 +3,30 @@ import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
+// GET — fetch recent generated images from Supabase
+export async function GET() {
+  try {
+    const { data, error } = await supabase
+      .from("generated_images")
+      .select("topic, image_url, created_at")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (error) throw error;
+
+    const images = (data || []).map((row: any) => ({
+      imageUrl: row.image_url,
+      topic: row.topic,
+      createdAt: row.created_at,
+    }));
+
+    return NextResponse.json({ images });
+  } catch (err) {
+    console.error("image-generate GET error:", err);
+    return NextResponse.json({ images: [] });
+  }
+}
+
 const ratioToSize: Record<string, { width: number; height: number }> = {
   square:    { width: 1024, height: 1024 },
   landscape: { width: 1280, height: 720  },

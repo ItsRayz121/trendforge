@@ -5,8 +5,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Label, FormGroup, Textarea } from "@/components/ui/input";
 import { platforms, imageRatios } from "@/data/platforms";
-import { generateImagePrompt } from "@/lib/ai";
 import type { Platform, ImageGenerateRequest, ImageGenerateResponse } from "@/lib/types";
+import toast from "react-hot-toast";
 import {
   ImageIcon,
   Wand2,
@@ -75,10 +75,10 @@ export default function ImageGeneratorPage() {
   const [imageHistory, setImageHistory] = useState<ImageHistoryItem[]>([]);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("trendforge_image_history");
-      if (stored) setImageHistory(JSON.parse(stored));
-    } catch { /* ignore */ }
+    fetch("/api/image-generate")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.images) setImageHistory(data.images); })
+      .catch(() => {});
   }, []);
 
   const currentRatios = imageRatios[platform] || [];
@@ -97,6 +97,7 @@ export default function ImageGeneratorPage() {
     setGeneratedImageUrl(null);
     setSaved(false);
     setSavedToContent(false);
+    const toastId = toast.loading("Generating AI prompt...");
     try {
       const req: ImageGenerateRequest = {
         platform,
@@ -108,32 +109,35 @@ export default function ImageGeneratorPage() {
         campaignGoal,
         brandColors,
       };
-      const res = await generateImagePrompt(req);
-      setResult(res);
 
-      // Now generate the real image via Pollinations
+      // Step 1: Generate the AI prompt
+      const promptRes = await fetch("/api/generate-image-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req),
+      });
+      if (!promptRes.ok) throw new Error("Prompt generation failed");
+      const promptData: ImageGenerateResponse = await promptRes.json();
+      setResult(promptData);
+      toast.loading("Rendering image...", { id: toastId });
+
+      // Step 2: Generate the real image via Pollinations
       setImageLoading(true);
       const imgRes = await fetch("/api/image-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: res.prompt, ratio, style: visualStyle, topic }),
+        body: JSON.stringify({ prompt: promptData.prompt, ratio, style: visualStyle, topic }),
       });
       if (imgRes.ok) {
         const { imageUrl } = await imgRes.json();
         setGeneratedImageUrl(imageUrl);
-
-        // Save to local history
-        const historyItem: ImageHistoryItem = {
-          imageUrl,
-          topic,
-          createdAt: new Date().toISOString(),
-        };
-        setImageHistory((prev) => {
-          const updated = [historyItem, ...prev].slice(0, 5);
-          localStorage.setItem("trendforge_image_history", JSON.stringify(updated));
-          return updated;
-        });
+        setImageHistory((prev) => [{ imageUrl, topic, createdAt: new Date().toISOString() }, ...prev].slice(0, 5));
+        toast.success("Image generated!", { id: toastId });
+      } else {
+        toast.error("Image render failed", { id: toastId });
       }
+    } catch (err: any) {
+      toast.error(err.message || "Generation failed", { id: toastId });
     } finally {
       setLoading(false);
       setImageLoading(false);
@@ -168,13 +172,17 @@ export default function ImageGeneratorPage() {
       });
       if (res.ok) {
         setSavedToContent(true);
+        toast.success("Saved to Content!");
       } else {
         const err = await res.json().catch(() => ({}));
-        setSaveContentError(err.error || "Save failed");
+        const msg = err.error || "Save failed";
+        setSaveContentError(msg);
+        toast.error(msg);
         setTimeout(() => setSaveContentError(null), 4000);
       }
     } catch {
       setSaveContentError("Network error — try again");
+      toast.error("Network error — try again");
       setTimeout(() => setSaveContentError(null), 4000);
     } finally {
       setSavingToContent(false);
@@ -196,9 +204,14 @@ export default function ImageGeneratorPage() {
           imageUrl: generatedImageUrl,
         }),
       });
-      if (res.ok) setSaved(true);
+      if (res.ok) {
+        setSaved(true);
+        toast.success("Image saved to library!");
+      } else {
+        toast.error("Save failed");
+      }
     } catch {
-      setSaved(true); // optimistic
+      toast.error("Save failed — try again");
     }
   };
 
