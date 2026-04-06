@@ -94,6 +94,7 @@ export default function ImageGeneratorPage() {
     setLoading(true);
     setGeneratedImageUrl(null);
     setSaved(false);
+    setSavedToContent(false);
     try {
       const req: ImageGenerateRequest = {
         platform,
@@ -480,14 +481,28 @@ export default function ImageGeneratorPage() {
                       AI Image Prompt
                     </div>
                   </CardTitle>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => handleCopy(result.prompt, "prompt")}
-                  >
-                    {copied === "prompt" ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copied === "prompt" ? "Copied!" : "Copy Prompt"}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleCopy(result.prompt, "prompt")}
+                    >
+                      {copied === "prompt" ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copied === "prompt" ? "Copied!" : "Copy"}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleSaveToSavedContent}
+                      disabled={savedToContent}
+                    >
+                      {savedToContent ? (
+                        <><BookmarkCheck className="w-3.5 h-3.5 text-green-400" /> Saved!</>
+                      ) : (
+                        <><Bookmark className="w-3.5 h-3.5" /> Save to Content</>
+                      )}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="bg-surface-700 border border-surface-500 rounded-xl p-4">
