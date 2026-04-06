@@ -70,6 +70,8 @@ export default function ImageGeneratorPage() {
   const [imageLoading, setImageLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savedToContent, setSavedToContent] = useState(false);
+  const [savingToContent, setSavingToContent] = useState(false);
+  const [saveContentError, setSaveContentError] = useState<string | null>(null);
   const [imageHistory, setImageHistory] = useState<ImageHistoryItem[]>([]);
 
   useEffect(() => {
@@ -145,23 +147,38 @@ export default function ImageGeneratorPage() {
   };
 
   const handleSaveToSavedContent = async () => {
-    if (!generatedImageUrl || !result) return;
+    if (!result) return;
+    setSavingToContent(true);
+    setSaveContentError(null);
     try {
       const res = await fetch("/api/save-content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          topic,
+          topic: topic || "Image Prompt",
           platform,
-          content: `🖼️ AI Generated Image\n\nPrompt: ${result.prompt}\n\nImage URL: ${generatedImageUrl}`,
+          content: generatedImageUrl
+            ? `🖼️ AI Generated Image\n\nPrompt: ${result.prompt}\n\nImage: ${generatedImageUrl}`
+            : `🖼️ AI Image Prompt\n\n${result.prompt}`,
           hashtags: [],
-          cta: "",
+          cta: result.styleDirection || "",
           char_count: result.prompt.length,
           generated_at: new Date().toISOString(),
         }),
       });
-      if (res.ok) setSavedToContent(true);
-    } catch { /* ignore */ }
+      if (res.ok) {
+        setSavedToContent(true);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setSaveContentError(err.error || "Save failed");
+        setTimeout(() => setSaveContentError(null), 4000);
+      }
+    } catch {
+      setSaveContentError("Network error — try again");
+      setTimeout(() => setSaveContentError(null), 4000);
+    } finally {
+      setSavingToContent(false);
+    }
   };
 
   const handleSaveToLibrary = async () => {
@@ -438,10 +455,11 @@ export default function ImageGeneratorPage() {
                           variant="secondary"
                           size="sm"
                           onClick={handleSaveToSavedContent}
-                          disabled={savedToContent}
+                          disabled={savedToContent || savingToContent}
+                          loading={savingToContent}
                         >
                           {savedToContent ? (
-                            <><BookmarkCheck className="w-3.5 h-3.5 text-green-400" /> Saved to Library</>
+                            <><BookmarkCheck className="w-3.5 h-3.5 text-green-400" /> Saved!</>
                           ) : (
                             <><Bookmark className="w-3.5 h-3.5" /> Save to Content</>
                           )}
@@ -494,7 +512,8 @@ export default function ImageGeneratorPage() {
                       variant="secondary"
                       size="sm"
                       onClick={handleSaveToSavedContent}
-                      disabled={savedToContent}
+                      disabled={savedToContent || savingToContent}
+                      loading={savingToContent}
                     >
                       {savedToContent ? (
                         <><BookmarkCheck className="w-3.5 h-3.5 text-green-400" /> Saved!</>
@@ -508,6 +527,9 @@ export default function ImageGeneratorPage() {
                   <div className="bg-surface-700 border border-surface-500 rounded-xl p-4">
                     <p className="text-sm text-slate-200 leading-relaxed font-mono">{result.prompt}</p>
                   </div>
+                  {saveContentError && (
+                    <p className="mt-2 text-xs text-red-400 px-1">{saveContentError}</p>
+                  )}
                 </CardContent>
               </Card>
 
