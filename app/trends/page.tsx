@@ -5,11 +5,12 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Label } from "@/components/ui/input";
-import { fetchTrends, trendCategories } from "@/lib/trends";
+import { trendCategories } from "@/lib/trends";
 import { getViralityColor, getViralityLabel, timeAgo } from "@/lib/utils";
 import type { Trend } from "@/lib/types";
 import { countries } from "@/data/countries";
 import { ScrapeExplorer } from "@/components/scrape-explorer";
+import toast from "react-hot-toast";
 import {
   TrendingUp,
   Search,
@@ -40,6 +41,7 @@ const timeframeLabels: Record<Timeframe, string> = {
 export default function TrendsPage() {
   const [trends, setTrends] = useState<Trend[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLive, setIsLive] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -48,25 +50,31 @@ export default function TrendsPage() {
   const loadTrends = async () => {
     setLoading(true);
     try {
-      const data = await fetchTrends({
-        country: selectedCountry !== "all" ? selectedCountry : undefined,
-        category: selectedCategory !== "all" ? selectedCategory : undefined,
-        query: query || undefined,
-        limit: timeframe === "breaking" ? 50 : 300,
-        breakingOnly: timeframe === "breaking",
-      });
+      const params = new URLSearchParams();
+      if (selectedCountry !== "all") params.set("country", selectedCountry);
+      if (selectedCategory !== "all") params.set("category", selectedCategory);
+      if (query) params.set("q", query);
+
+      const res = await fetch(`/api/trends?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch trends");
+      const data = await res.json();
+
+      let results: Trend[] = data.trends || [];
+      setIsLive(data.source === "live");
 
       if (timeframe === "breaking") {
-        // Show only high virality breaking news
-        const breaking = data.filter((t) => t.virality >= 75);
-        setTrends(breaking);
+        results = results.filter((t) => t.virality >= 75);
       } else {
         const threshold = timeframeMs[timeframe];
-        const filtered = data.filter(
+        const filtered = results.filter(
           (t) => Date.now() - new Date(t.publishedAt).getTime() <= threshold
         );
-        setTrends(filtered.length > 0 ? filtered : data);
+        results = filtered.length > 0 ? filtered : results;
       }
+
+      setTrends(results);
+    } catch (err: any) {
+      toast.error("Failed to load trends");
     } finally {
       setLoading(false);
     }
@@ -190,10 +198,14 @@ export default function TrendsPage() {
               <p className="text-xs text-slate-500">
                 {trends.length} trends found
               </p>
-              <Badge variant="success">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                Live
-              </Badge>
+              {isLive ? (
+                <Badge variant="success">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  Live
+                </Badge>
+              ) : (
+                <Badge variant="default">Demo data</Badge>
+              )}
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               {trends.map((trend) => (
