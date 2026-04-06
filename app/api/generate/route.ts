@@ -2,6 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateContent } from "@/lib/ai";
 import type { GenerateRequest } from "@/lib/types";
 
+/** Pull a string field from an object, trying multiple key spellings */
+function extractField(obj: any, ...keys: string[]): string {
+  for (const key of keys) {
+    if (typeof obj?.[key] === "string" && obj[key].trim()) return obj[key];
+  }
+  return "";
+}
+
+/** Drill into nested objects to find the actual content object */
+function unwrapParsed(parsed: any): any {
+  if (!parsed || typeof parsed !== "object") return {};
+  // If it already has a "content" string field, use it directly
+  if (typeof parsed.content === "string") return parsed;
+  // Otherwise look one level deep (e.g. { instagram_post: { content, hashtags, cta } })
+  for (const key of Object.keys(parsed)) {
+    const val = parsed[key];
+    if (val && typeof val === "object" && typeof val.content === "string") {
+      return val;
+    }
+  }
+  return parsed;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: GenerateRequest = await req.json();
@@ -13,7 +36,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check for custom key/model/baseUrl from client headers first, then env
     const customApiKey = req.headers.get("x-custom-api-key");
     const customModel = req.headers.get("x-ai-model");
     const customBaseUrl = req.headers.get("x-base-url");
@@ -22,36 +44,49 @@ export async function POST(req: NextRequest) {
     const model = customModel || process.env.OPENAI_MODEL || "google/gemini-2.0-flash-001";
 
     if (apiKey && apiKey !== "your_openai_api_key_here") {
-      // OpenRouter/OpenAI generation
       const outputs = await Promise.all(
         body.platforms.map(async (platform) => {
+          const platformRules: Record<string, string> = {
+            twitter: "Max 280 characters total. 1-3 hashtags only. Punchy and concise.",
+            instagram: "Max 2200 chars. 5-10 hashtags. Use emojis naturally.",
+            facebook: "Conversational tone. 3-5 hashtags. Can be longer.",
+            telegram: "Detailed, markdown supported. No char limit.",
+            linkedin: "Professional tone. Max 3000 chars. 3-5 hashtags.",
+          };
+
           const response = await fetch(`${baseUrl}/chat/completions`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               Authorization: `Bearer ${apiKey}`,
-              ...(baseUrl.includes("openrouter") && { "HTTP-Referer": "http://localhost:3000" }),
+              ...(baseUrl.includes("openrouter") && {
+                "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://trendforge-enlq.vercel.app",
+                "X-Title": "TrendForge",
+              }),
             },
             body: JSON.stringify({
               model,
               messages: [
                 {
                   role: "system",
-                  content: `You are a professional social media content creator. Generate platform-optimized content in JSON format.`,
+                  content:
+                    "You are a professional social media content creator. Always respond with valid JSON only — no markdown, no explanation, no code fences. The JSON must have exactly these fields: content (string), hashtags (array of strings), cta (string).",
                 },
                 {
                   role: "user",
-                  content: `Create a ${body.tone} ${platform} post about "${body.topic}" for ${body.country} ${body.niche} audience.
-Return JSON: { "content": "...", "hashtags": ["#tag1", "#tag2"], "cta": "...", "charCount": 0 }
-Platform rules:
-- twitter: max 280 chars, 1-3 hashtags
-- instagram: max 2200 chars, 5-10 hashtags, emojis
-- facebook: conversational, 3-5 hashtags
-- telegram: detailed, markdown supported
-- linkedin: professional tone, max 3000 chars, 3-5 hashtags${body.customPrompt ? `\n\nAdditional instructions: ${body.customPrompt}` : ""}`,
+                  content: `Write a ${body.tone || "professional"} ${platform} post about: "${body.topic}"
+Target audience: ${body.country || "Global"} — ${body.niche || "General"}
+Platform rule: ${platformRules[platform] || ""}
+${body.customPrompt ? `Extra instructions: ${body.customPrompt}` : ""}
+
+Respond with this JSON and nothing else:
+{
+  "content": "<the post text>",
+  "hashtags": ["#tag1", "#tag2"],
+  "cta": "<call to action sentence>"
+}`,
                 },
               ],
-              response_format: { type: "json_object" },
               max_tokens: 2000,
             }),
           });
@@ -60,22 +95,46 @@ Platform rules:
             const errText = await response.text();
             throw new Error(`API error ${response.status}: ${errText}`);
           }
+
           const data = await response.json();
-          const raw = data.choices?.[0]?.message?.content || "{}";
+          let raw: string = data.choices?.[0]?.message?.content || "{}";
+
+          // Strip markdown code fences if the model added them
+          raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
           let parsed: any = {};
           try {
             parsed = JSON.parse(raw);
           } catch {
-            // Gemini sometimes returns truncated JSON — extract what we can
-            const contentMatch = raw.match(/"content"\s*:\s*"([\s\S]*?)(?:"|$)/);
-            parsed = { content: contentMatch?.[1] || raw.slice(0, 500), hashtags: [], cta: "" };
+            // Try extracting JSON object from within the text
+            const jsonMatch = raw.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              try { parsed = JSON.parse(jsonMatch[0]); } catch { /* ignore */ }
+            }
+            if (!parsed.content) {
+              // Last resort: pull content with regex
+              const contentMatch = raw.match(/"content"\s*:\s*"([\s\S]*?)(?<!\\)"/);
+              parsed = {
+                content: contentMatch?.[1]?.replace(/\\n/g, "\n") || raw.slice(0, 1000),
+                hashtags: [],
+                cta: "",
+              };
+            }
           }
+
+          // Unwrap nested structures (some models nest inside a platform key)
+          parsed = unwrapParsed(parsed);
+
+          const content = extractField(parsed, "content", "text", "post", "body");
+          const hashtags = Array.isArray(parsed.hashtags) ? parsed.hashtags : [];
+          const cta = extractField(parsed, "cta", "call_to_action", "callToAction");
+
           return {
             platform,
-            ...parsed,
-            hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags : [],
-            cta: parsed.cta || "",
-            charCount: parsed.content?.length || 0,
+            content,
+            hashtags,
+            cta,
+            charCount: content.length,
           };
         })
       );
