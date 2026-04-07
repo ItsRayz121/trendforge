@@ -76,7 +76,7 @@ export default function ImageGeneratorPage() {
 
   useEffect(() => {
     fetch("/api/image-generate")
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => r.ok ? r.json() : { images: [] })
       .then((data) => { if (data?.images) setImageHistory(data.images); })
       .catch(() => {});
   }, []);

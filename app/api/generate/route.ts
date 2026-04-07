@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateContent } from "@/lib/ai";
 import { getAIConfig } from "@/lib/ai-client";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-server";
 import type { GenerateRequest } from "@/lib/types";
 
 /** Pull a string field from an object, trying multiple key spellings */
@@ -158,11 +158,12 @@ Respond with this JSON and nothing else:
       }
 
       // Log to Supabase (fire-and-forget)
-      supabase.from("content_generations").insert({
+      const sbClient = createClient();
+      void sbClient.from("content_generations").insert({
         topic: body.topic,
         platforms: body.platforms,
         generated_at: new Date().toISOString(),
-      }).then(() => {});
+      });
 
       return NextResponse.json({
         outputs,

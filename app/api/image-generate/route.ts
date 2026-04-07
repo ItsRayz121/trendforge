@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
+async function getUser() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return { supabase, user };
+}
+
 // GET — fetch recent generated images from Supabase
 export async function GET() {
+  const { supabase, user } = await getUser();
+  if (!user) return NextResponse.json({ images: [] });
+
   try {
     const { data, error } = await supabase
       .from("generated_images")
       .select("topic, image_url, created_at")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(10);
 
@@ -36,6 +46,9 @@ const ratioToSize: Record<string, { width: number; height: number }> = {
 };
 
 export async function POST(req: NextRequest) {
+  const { supabase, user } = await getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { prompt, ratio = "square", style = "", topic = "", saveOnly = false, imageUrl: existingUrl } = await req.json();
 
@@ -46,6 +59,7 @@ export async function POST(req: NextRequest) {
     // Save-only mode: just persist an already-generated image URL
     if (saveOnly && existingUrl) {
       await supabase.from("generated_images").insert({
+        user_id: user.id,
         topic: topic || prompt.slice(0, 100),
         prompt,
         image_url: existingUrl,
@@ -56,11 +70,11 @@ export async function POST(req: NextRequest) {
 
     const { width, height } = ratioToSize[ratio] ?? ratioToSize.square;
 
-    // Pollinations URL is the image itself — no API call needed, just construct the URL
     const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${width}&height=${height}&nologo=true&model=flux&seed=${Date.now()}`;
 
     // Save to Supabase
     await supabase.from("generated_images").insert({
+      user_id: user.id,
       topic: topic || prompt.slice(0, 100),
       prompt,
       image_url: imageUrl,

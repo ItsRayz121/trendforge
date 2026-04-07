@@ -21,25 +21,30 @@ export async function checkKeywords() {
     for (const kw of keywords) {
       try {
         const articles = await findArticlesForKeyword(kw.keyword);
+        if (articles.length === 0) continue;
 
-        for (const article of articles) {
-          const { count } = await supabase
-            .from("alert_hits")
-            .select("id", { count: "exact", head: true })
-            .eq("keyword", kw.keyword)
-            .eq("headline", article.title);
+        // Batch fetch existing headlines for this keyword in one query
+        const { data: existing } = await supabase
+          .from("alert_hits")
+          .select("headline")
+          .eq("keyword", kw.keyword);
 
-          if ((count ?? 0) === 0) {
-            await supabase.from("alert_hits").insert({
+        const existingHeadlines = new Set((existing || []).map((h: any) => h.headline));
+
+        const newArticles = articles.filter((a) => !existingHeadlines.has(a.title));
+
+        if (newArticles.length > 0) {
+          await supabase.from("alert_hits").insert(
+            newArticles.map((a) => ({
               keyword: kw.keyword,
-              headline: article.title,
-              source: article.source,
-              url: article.url,
-              matched_at: article.publishedAt,
+              headline: a.title,
+              source: a.source,
+              url: a.url,
+              matched_at: a.publishedAt,
               read: false,
-            });
-            newHits++;
-          }
+            }))
+          );
+          newHits += newArticles.length;
         }
       } catch (kwErr) {
         console.warn(`Failed to check keyword "${kw.keyword}":`, kwErr);

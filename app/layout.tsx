@@ -7,7 +7,10 @@ import { ToastProvider } from "@/components/toast-provider";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "TrendForge — AI Content Creation Platform",
+  title: {
+    default: "TrendForge — AI Content Creation Platform",
+    template: "%s | TrendForge",
+  },
   description:
     "AI-powered content generation for Telegram, Instagram, Facebook & Twitter. Real-time trends, platform-specific outputs, and smart scheduling.",
   keywords: "AI content, social media, trend analysis, content generator, marketing",

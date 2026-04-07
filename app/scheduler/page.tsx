@@ -236,7 +236,7 @@ export default function SchedulerPage() {
                     </FormGroup>
                     <Button
                       onClick={handleAddPost}
-                      disabled={!newContent.trim() || !scheduledAt}
+                      disabled={!newContent.trim() || !scheduledAt || submitting}
                       loading={submitting}
                       className="w-full"
                     >

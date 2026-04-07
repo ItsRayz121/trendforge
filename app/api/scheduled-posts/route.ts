@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
+async function getUser() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return { supabase, user };
+}
+
 export async function GET() {
+  const { supabase, user } = await getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { data, error } = await supabase
     .from("scheduled_posts")
     .select("*")
+    .eq("user_id", user.id)
     .order("scheduled_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -14,6 +24,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const { supabase, user } = await getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json();
   const { topic, content, platform, scheduled_at } = body;
 
@@ -23,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("scheduled_posts")
-    .insert({ topic, content, platform, scheduled_at, status: "scheduled" })
+    .insert({ user_id: user.id, topic, content, platform, scheduled_at, status: "scheduled" })
     .select()
     .single();
 
@@ -32,17 +45,28 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const { supabase, user } = await getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
 
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
-  const { error } = await supabase.from("scheduled_posts").delete().eq("id", id);
+  const { error } = await supabase
+    .from("scheduled_posts")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
 
 export async function PATCH(req: NextRequest) {
+  const { supabase, user } = await getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id, status } = await req.json();
   if (!id || !status) return NextResponse.json({ error: "id and status required" }, { status: 400 });
 
@@ -50,6 +74,7 @@ export async function PATCH(req: NextRequest) {
     .from("scheduled_posts")
     .update({ status })
     .eq("id", id)
+    .eq("user_id", user.id)
     .select()
     .single();
 

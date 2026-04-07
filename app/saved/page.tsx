@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { copyToClipboard, timeAgo } from "@/lib/utils";
 import type { Platform } from "@/lib/types";
+import toast from "react-hot-toast";
 import {
   Bookmark,
   Search,
@@ -66,10 +67,15 @@ export default function SavedPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/save-content");
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Failed to load saved content");
+        return;
       }
+      const data = await res.json();
+      setItems(data);
+    } catch {
+      toast.error("Network error — could not load saved content");
     } finally {
       setLoading(false);
     }
