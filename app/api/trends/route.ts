@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
       const response = await fetch(
         `https://gnews.io/api/v4/top-headlines?${params}`,
-        { next: { revalidate: 900 } }
+        { cache: "no-store" }
       );
 
       if (response.ok) {

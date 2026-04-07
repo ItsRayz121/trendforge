@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     const searchParamsString = new URLSearchParams(params).toString();
     const response = await fetch(
       `https://serpapi.com/search?${searchParamsString}`,
-      { next: { revalidate: 3600 } } // Cache 1 hour
+      { cache: "no-store" }
     );
 
     if (!response.ok) {

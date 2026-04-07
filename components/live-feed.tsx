@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card";
 import type { Trend } from "@/lib/types";
 import { timeAgo, getViralityColor, getViralityLabel } from "@/lib/utils";
 import { TrendingUp, ExternalLink, Zap } from "lucide-react";
-import { demoTrends } from "@/data/demo-topics";
 
 interface LiveFeedProps {
   compact?: boolean;
@@ -18,13 +17,11 @@ export function LiveFeed({ compact, limit = 5, onSelectTrend }: LiveFeedProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadTrends = async () => {
-      setLoading(true);
-      await new Promise((r) => setTimeout(r, 600));
-      setTrends(demoTrends.slice(0, limit));
-      setLoading(false);
-    };
-    loadTrends();
+    fetch(`/api/trends?limit=${limit}`)
+      .then((r) => r.ok ? r.json() : { trends: [] })
+      .then((data) => setTrends((data.trends ?? []).slice(0, limit)))
+      .catch(() => setTrends([]))
+      .finally(() => setLoading(false));
   }, [limit]);
 
   if (loading) {
@@ -37,6 +34,15 @@ export function LiveFeed({ compact, limit = 5, onSelectTrend }: LiveFeedProps) {
             <div className="shimmer h-3 w-2/3 rounded" />
           </div>
         ))}
+      </div>
+    );
+  }
+
+  if (trends.length === 0) {
+    return (
+      <div className="text-center py-6">
+        <TrendingUp className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+        <p className="text-xs text-slate-500">No trends available right now</p>
       </div>
     );
   }
